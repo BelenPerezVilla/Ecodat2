@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Ecodata - Privilegios</title>
+    <title>Ecodata - Productos</title>
     <style>
         body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
         .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
@@ -13,20 +13,19 @@
         .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
         .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
         
-        /* Estilos del Módulo */
         .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
-        input, select { padding: 10px; margin-right: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        input, select { padding: 10px; margin-right: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 4px; }
         .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
-        .btn-add { background-color: #28a745; }
-        .btn-edit { background-color: #ffc107; color: black; padding: 5px 10px; }
-        .btn-delete { background-color: #dc3545; padding: 5px 10px; }
+        .btn-add { background-color: #007bff; }
+        .btn-add:hover { background-color: #0056b3; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
         th { background-color: #343a40; color: white; }
-        .msg { margin-bottom: 10px; font-weight: bold; }
-        .msg.success { color: green; }
-        .msg.error { color: red; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        
+        .msg { margin-bottom: 10px; font-weight: bold; padding: 10px; border-radius: 4px;}
+        .msg.success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
     </style>
 </head>
 <body>
@@ -34,15 +33,15 @@
         <h2>ECODATA</h2>
         <a href="/dashboard">Inicio</a>
         <a href="/bodegas">Bodegas</a>
-        <a href="/productos">Productos</a>
+        <a href="/productos" class="active">Productos</a>
         <a href="/procesos">Procesos</a>
         <a href="/contabilidad">Administración Contable</a>
-        <a href="/usuarios" class="active">Privilegios (Usuarios)</a>
+        <a href="/usuarios">Privilegios (Usuarios)</a>
     </div>
 
     <div class="main">
         <div class="topbar">
-            <h3>Gestión de Privilegios</h3>
+            <h3>Gestión de Productos Terminados</h3>
             <div>
                 <span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | 
                 <a href="/logout" class="btn-logout">Cerrar Sesión</a>
@@ -50,7 +49,7 @@
         </div>
 
         <div class="card">
-            <h4>Registrar Nuevo Usuario</h4>
+            <h4>Registrar Producción de Herramientas</h4>
             
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
@@ -60,41 +59,52 @@
               {% endif %}
             {% endwith %}
 
-            <form method="POST" action="/usuarios">
-                <input type="text" name="usuario" placeholder="Nombre de usuario" required>
-                <input type="text" name="contrasena" placeholder="Contraseña" required>
-                <select name="id_area" required>
-                    <option value="">-- Seleccione un Área --</option>
-                    {% for area in areas %}
-                    <option value="{{ area.id_area }}">{{ area.nombre_area }}</option>
+            <form method="POST" action="/productos">
+                <select name="id_producto" required>
+                    <option value="">-- Seleccione Herramienta --</option>
+                    {% for prod in productos %}
+                        <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-add">Guardar Usuario</button>
+
+                <select name="id_almacen" required>
+                    <option value="">-- Seleccione Bodega Destino --</option>
+                    {% for alm in almacenes %}
+                        <option value="{{ alm.id_almacen }}">{{ alm.nombre_almacen }}</option>
+                    {% endfor %}
+                </select>
+
+                <input type="number" name="cantidad" placeholder="Cantidad (Piezas)" required>
+                <input type="date" name="fecha_fabricacion" required>
+
+                <button type="submit" class="btn btn-add">Guardar Producción</button>
             </form>
         </div>
 
         <div class="card">
-            <h4>Usuarios en el Sistema</h4>
+            <h4>Stock de Herramientas Terminadas</h4>
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Usuario</th>
-                        <th>Área Asignada</th>
-                        <th>Acciones</th>
+                        <th>ID Lote</th>
+                        <th>Herramienta</th>
+                        <th>Bodega</th>
+                        <th>Piezas Disponibles</th>
+                        <th>Fecha de Fabricación</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for user in usuarios %}
+                    {% for item in inventario %}
                     <tr>
-                        <td>{{ user.id_usuario }}</td>
-                        <td>{{ user.usuario }}</td>
-                        <td>{{ user.area.nombre_area if user.area else 'Sin área' }}</td>
-                        <td>
-                           <a href="/editar_usuario/{{ user.id_usuario }}" class="btn btn-edit" style="text-decoration: none;">Editar</a>
-    
-                            <a href="/eliminar_usuario/{{ user.id_usuario }}" class="btn btn-delete" style="text-decoration: none;" onclick="return confirm('¿Estás seguro de que deseas eliminar a este usuario?');">Eliminar</a>
-                        </td>
+                        <td>{{ item.id_inventario_p }}</td>
+                        <td>{{ item.producto.nombre_producto }}</td>
+                        <td>{{ item.almacen.nombre_almacen }}</td>
+                        <td>{{ item.cantidad_stock }} uds.</td>
+                        <td>{{ item.fecha_fabricacion }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center;">No hay herramientas registradas en el inventario.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -67,3 +67,29 @@ class InventarioProducto(db.Model):
     id_producto = db.Column(db.Integer, db.ForeignKey('producto.id_producto'), nullable=False)
     cantidad_stock = db.Column(db.Integer, nullable=False) # Piezas disponibles
     fecha_fabricacion = db.Column(db.Date, nullable=False)
+# ==========================================
+# 3. TABLA DE PROCESOS DE FABRICACIÓN
+# ==========================================
+class Proceso(db.Model):
+    __tablename__ = 'proceso'
+    id_proceso = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nombre_proceso = db.Column(db.String(150), nullable=False) # Ej. "Fundición de palas lote A"
+    id_inventario_m = db.Column(db.Integer, db.ForeignKey('inventario_metal.id_inventario_m'), nullable=False)
+    id_producto = db.Column(db.Integer, db.ForeignKey('producto.id_producto'), nullable=False)
+    estado = db.Column(db.String(50), nullable=False, default='En progreso') 
+    fecha_inicio = db.Column(db.Date, nullable=False)
+
+    # Relaciones para conectar la tabla fácilmente
+    metal = db.relationship('InventarioMetal', backref='procesos_asignados', lazy=True)
+    producto_final = db.relationship('Producto', backref='procesos_asignados', lazy=True)
+
+# ==========================================
+# 4. TABLA DE ADMINISTRACIÓN CONTABLE
+# ==========================================
+class Transaccion(db.Model):
+    __tablename__ = 'transaccion'
+    id_transaccion = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    tipo = db.Column(db.String(50), nullable=False) # 'Ingreso' o 'Egreso'
+    concepto = db.Column(db.String(255), nullable=False) # Ej. 'Venta de palas', 'Pago a proveedor'
+    monto = db.Column(db.Float, nullable=False)
+    fecha_transaccion = db.Column(db.Date, nullable=False)

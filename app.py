@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from models import db, Area, InicioLog
+from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
@@ -27,6 +27,24 @@ with app.app_context():
         usuario_admin = InicioLog(id_area=area_admin.id_area, usuario='admin', contrasena='admin123')
         db.session.add(usuario_admin)
         db.session.commit()
+    # --- NUEVO: Crear un Proveedor y un Almacén de prueba si no existen ---
+    if not Proveedor.query.first():
+        prov_prueba = Proveedor(nombre="Reciclados Metálicos S.A.", telefono="555-1234")
+        db.session.add(prov_prueba)
+        db.session.commit()
+        
+    if not Almacen.query.first():
+        alm_prueba = Almacen(nombre_almacen="Bodega Principal", ubicacion="Nave Industrial 1")
+        db.session.add(alm_prueba)
+        db.session.commit()
+    # --- NUEVO: Crear un par de Productos de prueba en el catálogo ---
+    if not Producto.query.first():
+        prod1 = Producto(nombre_producto="Pala de Acero", descripcion="Pala cuadrada uso rudo")
+        prod2 = Producto(nombre_producto="Pico de Construcción", descripcion="Pico estándar")
+        db.session.add_all([prod1, prod2])
+        db.session.commit()
+
+
 
 # Ruta principal: Inicio de sesión
 @app.route('/', methods=['GET', 'POST'])
@@ -47,12 +65,188 @@ def login():
             
     return render_template('index.html')
 
-# Ruta del Dashboard
+# --- RUTAS DE LA APLICACIÓN ---
+
 @app.route('/dashboard')
 def dashboard():
+    # Validar que el usuario haya iniciado sesión
     if 'usuario' not in session:
         return redirect(url_for('login'))
-    return render_template('dashboard.html', usuario=session['usuario'])
+        
+    # --- RECOPILAR DATOS PARA LAS GRÁFICAS ---
+    # 1. Totales de Inventario
+    total_metal = db.session.query(db.func.sum(InventarioMetal.cantidad_kg)).scalar() or 0
+    total_productos = db.session.query(db.func.sum(InventarioProducto.cantidad_stock)).scalar() or 0
+    
+    # 2. Finanzas
+    total_ingresos = db.session.query(db.func.sum(Transaccion.monto)).filter_by(tipo='Ingreso').scalar() or 0
+    total_egresos = db.session.query(db.func.sum(Transaccion.monto)).filter_by(tipo='Egreso').scalar() or 0
+    
+    # 3. Procesos
+    procesos_activos = Proceso.query.filter_by(estado='En progreso').count()
+    
+    return render_template('dashboard.html', 
+                           usuario_actual=session['usuario'],
+                           total_metal=total_metal,
+                           total_productos=total_productos,
+                           total_ingresos=total_ingresos,
+                           total_egresos=total_egresos,
+                           procesos_activos=procesos_activos)
+
+# --- MÓDULO BODEGAS / INVENTARIO DE METAL ---
+@app.route('/bodegas', methods=['GET', 'POST'])
+def bodegas():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        # Recibir los datos del formulario
+        id_almacen = request.form.get('id_almacen')
+        id_proveedor = request.form.get('id_proveedor')
+        tipo_metal = request.form['tipo_metal']
+        cantidad = request.form['cantidad']
+        fecha = request.form['fecha_entrada']
+        
+        # Guardar en la base de datos
+        nuevo_metal = InventarioMetal(
+            id_almacen=id_almacen,
+            id_proveedor=id_proveedor,
+            tipo_metal=tipo_metal,
+            cantidad_kg=cantidad,
+            fecha_entrada=fecha
+        )
+        db.session.add(nuevo_metal)
+        db.session.commit()
+        flash('Entrada de metal registrada exitosamente.', 'success')
+        return redirect(url_for('bodegas'))
+        
+    # Obtener los datos para mostrarlos en pantalla
+    inventario = InventarioMetal.query.all()
+    almacenes = Almacen.query.all()
+    proveedores = Proveedor.query.all()
+    
+    return render_template('bodegas.html', 
+                           inventario=inventario, 
+                           almacenes=almacenes, 
+                           proveedores=proveedores,
+                           usuario_actual=session['usuario'])
+    # --- NUEVO: Crear un par de Productos de prueba en el catálogo ---
+    if not Producto.query.first():
+        prod1 = Producto(nombre_producto="Pala de Acero", descripcion="Pala cuadrada uso rudo")
+        prod2 = Producto(nombre_producto="Pico de Construcción", descripcion="Pico estándar")
+        db.session.add_all([prod1, prod2])
+        db.session.commit()
+# --- MÓDULO PRODUCTOS / INVENTARIO DE HERRAMIENTAS ---
+@app.route('/productos', methods=['GET', 'POST'])
+def productos():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        id_producto = request.form.get('id_producto')
+        id_almacen = request.form.get('id_almacen')
+        cantidad = request.form['cantidad']
+        fecha = request.form['fecha_fabricacion']
+        
+        # Registrar la nueva producción en el inventario
+        nueva_produccion = InventarioProducto(
+            id_producto=id_producto,
+            id_almacen=id_almacen,
+            cantidad_stock=cantidad,
+            fecha_fabricacion=fecha
+        )
+        db.session.add(nueva_produccion)
+        db.session.commit()
+        
+        flash('Producción de herramientas registrada exitosamente.', 'success')
+        return redirect(url_for('productos'))
+        
+    # Obtener datos para mostrar en la pantalla
+    inventario_prod = InventarioProducto.query.all()
+    lista_productos = Producto.query.all()
+    almacenes = Almacen.query.all()
+    
+    return render_template('productos.html', 
+                           inventario=inventario_prod, 
+                           productos=lista_productos, 
+                           almacenes=almacenes,
+                           usuario_actual=session['usuario'])
+# --- MÓDULO PROCESOS DE FABRICACIÓN ---
+@app.route('/procesos', methods=['GET', 'POST'])
+def procesos():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        nombre_proceso = request.form['nombre_proceso']
+        id_metal = request.form.get('id_metal')
+        id_producto = request.form.get('id_producto')
+        estado = request.form['estado']
+        fecha_inicio = request.form['fecha_inicio']
+        
+        # Guardar el nuevo proceso
+        nuevo_proceso = Proceso(
+            nombre_proceso=nombre_proceso,
+            id_inventario_m=id_metal,
+            id_producto=id_producto,
+            estado=estado,
+            fecha_inicio=fecha_inicio
+        )
+        db.session.add(nuevo_proceso)
+        db.session.commit()
+        
+        flash('Proceso de fabricación registrado exitosamente.', 'success')
+        return redirect(url_for('procesos'))
+        
+    # Obtener datos para los selectores y la tabla
+    lista_procesos = Proceso.query.all()
+    lotes_metal = InventarioMetal.query.all() # Para saber qué materia prima usar
+    catalogo_productos = Producto.query.all() # Para saber qué vamos a fabricar
+    
+    return render_template('procesos.html', 
+                           procesos=lista_procesos, 
+                           metales=lotes_metal, 
+                           productos=catalogo_productos,
+                           usuario_actual=session['usuario'])
+# --- MÓDULO DE ADMINISTRACIÓN CONTABLE ---
+@app.route('/contabilidad', methods=['GET', 'POST'])
+def contabilidad():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        tipo = request.form['tipo']
+        concepto = request.form['concepto']
+        monto = float(request.form['monto'])
+        fecha = request.form['fecha_transaccion']
+        
+        # Guardar el nuevo registro financiero
+        nueva_transaccion = Transaccion(
+            tipo=tipo,
+            concepto=concepto,
+            monto=monto,
+            fecha_transaccion=fecha
+        )
+        db.session.add(nueva_transaccion)
+        db.session.commit()
+        
+        flash('Transacción registrada exitosamente.', 'success')
+        return redirect(url_for('contabilidad'))
+        
+    # Consultar todas las transacciones (ordenadas por fecha, las más nuevas primero)
+    transacciones = Transaccion.query.order_by(Transaccion.fecha_transaccion.desc()).all()
+    
+    # Calcular Totales Matemáticamente
+    total_ingresos = sum(t.monto for t in transacciones if t.tipo == 'Ingreso')
+    total_egresos = sum(t.monto for t in transacciones if t.tipo == 'Egreso')
+    balance = total_ingresos - total_egresos
+    
+    return render_template('contabilidad.html', 
+                           transacciones=transacciones, 
+                           total_ingresos=total_ingresos,
+                           total_egresos=total_egresos,
+                           balance=balance,
+                           usuario_actual=session['usuario'])
 
 # Ruta para cerrar sesión
 @app.route('/logout')
