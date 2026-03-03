@@ -116,3 +116,11 @@ class Venta(db.Model):
     # Relaciones para conectar la venta con el cliente y el producto
     cliente = db.relationship('Cliente', backref='compras', lazy=True)
     producto = db.relationship('Producto', backref='ventas', lazy=True)
+# ==========================================
+# 6. MÓDULO DE PRIVILEGIOS (ROLES)
+# ==========================================
+class RolUsuario(db.Model):
+    __tablename__ = 'rol_usuario'
+    id_rol = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nombre_usuario = db.Column(db.String(50), nullable=False, unique=True)
+    rol = db.Column(db.String(50), nullable=False) # 'Administrador' u 'Operador'

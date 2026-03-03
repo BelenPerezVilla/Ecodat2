@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta
+from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario
 from urllib.parse import quote_plus
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash
 
 app = Flask(__name__)
 app.secret_key = 'hola123' # Necesario para las sesiones
@@ -14,6 +16,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://postgres:Hola123@localhos
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
+
+# --- VIGILANTE DE SESIONES (Se ejecuta antes de cargar cualquier pantalla) ---
+@app.before_request
+def cargar_rol():
+    if 'usuario' in session:
+        # Buscar el rol del usuario en la base de datos
+        rol_db = RolUsuario.query.filter_by(nombre_usuario=session['usuario']).first()
+        # Si no tiene rol asignado aún, te damos Administrador por defecto para que no te quedes fuera
+        session['rol'] = rol_db.rol if rol_db else 'Administrador'
 
 # Crear las tablas automáticamente y un usuario administrador de prueba
 with app.app_context():
@@ -47,24 +58,41 @@ with app.app_context():
 
 
 # Ruta principal: Inicio de sesión
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/') # La ruta raíz también te lleva al login
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Si ya tiene sesión, lo mandamos directo al panel
+    if 'usuario' in session:
+        return redirect(url_for('dashboard'))
+
     if request.method == 'POST':
-        usuario = request.form['usuario']
-        contrasena = request.form['contrasena']
+        usuario_ingresado = request.form['usuario']
+        password_ingresado = request.form['password']
         
-        # Buscar usuario en la base de datos
-        user = InicioLog.query.filter_by(usuario=usuario, contrasena=contrasena).first()
+        # 1. Buscamos si el usuario existe
+        usuario_db = InicioLog.query.filter_by(usuario=usuario_ingresado).first()
         
-        if user:
-            session['id_usuario'] = user.id_usuario
-            session['usuario'] = user.usuario
+        # 2. Comparamos la contraseña encriptada
+        if usuario_db and check_password_hash(usuario_db.contrasena, password_ingresado):
+            session['usuario'] = usuario_db.usuario
+            
+            # Buscamos su rol
+            rol_db = RolUsuario.query.filter_by(nombre_usuario=usuario_db.usuario).first()
+            if rol_db:
+                session['rol'] = rol_db.rol
+            else:
+                session['rol'] = 'Operador' # Por defecto si no tiene
+                
             return redirect(url_for('dashboard'))
         else:
             flash('Usuario o contraseña incorrectos', 'error')
             
-    return render_template('index.html')
+    return render_template('login.html')
 
+@app.route('/logout')
+def logout():
+    session.clear() # Borra los datos de la sesión
+    return redirect(url_for('login'))
 # --- RUTAS DE LA APLICACIÓN ---
 
 @app.route('/dashboard')
@@ -213,6 +241,10 @@ def procesos():
 def contabilidad():
     if 'usuario' not in session:
         return redirect(url_for('login'))
+    # Candado de seguridad para Contabilidad
+    if session.get('rol') != 'Administrador':
+        flash('Acceso restringido. No tienes permisos para ver las finanzas.', 'error')
+        return redirect(url_for('dashboard'))
         
     if request.method == 'POST':
         tipo = request.form['tipo']
@@ -312,12 +344,71 @@ def ventas():
                            ventas=lista_ventas,
                            productos=catalogo_productos,
                            usuario_actual=session['usuario'])
-# Ruta para cerrar sesión
-@app.route('/logout')
-def logout():
-    session.pop('id_usuario', None)
-    session.pop('usuario', None)
-    return redirect(url_for('login'))
+# --- MÓDULO DE PRIVILEGIOS Y GESTIÓN DE USUARIOS ---
+@app.route('/usuarios', methods=['GET', 'POST'])
+def usuarios():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    if session.get('rol') != 'Administrador':
+        flash('Acceso denegado: Solo los administradores pueden gestionar usuarios.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    if request.method == 'POST':
+        accion = request.form.get('accion')
+        
+        # ACCIÓN 1: CREAR O EDITAR USUARIO
+        if accion == 'guardar':
+            nombre_usuario = request.form['nombre_usuario']
+            password_plano = request.form['password']
+            nuevo_rol = request.form['rol']
+            
+            # 1. Guardar/Actualizar en la tabla de Inicio de Sesión (InicioLog)
+            usuario_login = InicioLog.query.filter_by(usuario=nombre_usuario).first()
+            if not usuario_login:
+                # Si no existe, lo creamos con contraseña encriptada
+                nuevo_user = InicioLog(
+                    usuario=nombre_usuario, 
+                    contrasena=generate_password_hash(password_plano)
+                )
+                db.session.add(nuevo_user)
+            elif password_plano: 
+                # Si ya existe y el admin escribió una nueva contraseña, se la actualizamos
+                usuario_login.contrasena = generate_password_hash(password_plano)
+
+            # 2. Guardar/Actualizar en la tabla de Roles (RolUsuario)
+            usuario_rol = RolUsuario.query.filter_by(nombre_usuario=nombre_usuario).first()
+            if not usuario_rol:
+                db.session.add(RolUsuario(nombre_usuario=nombre_usuario, rol=nuevo_rol))
+            else:
+                usuario_rol.rol = nuevo_rol
+                
+            db.session.commit()
+            flash(f'Usuario {nombre_usuario} guardado/actualizado correctamente.', 'success')
+            
+        # ACCIÓN 2: ELIMINAR USUARIO
+        elif accion == 'eliminar':
+            nombre_eliminar = request.form['nombre_usuario']
+            
+            # No permitir que el admin se elimine a sí mismo
+            if nombre_eliminar == session['usuario']:
+                flash('No puedes eliminar tu propia cuenta mientras estás conectado.', 'error')
+            else:
+                # Eliminar de ambas tablas
+                RolUsuario.query.filter_by(nombre_usuario=nombre_eliminar).delete()
+                InicioLog.query.filter_by(usuario=nombre_eliminar).delete()
+                db.session.commit()
+                flash(f'Usuario {nombre_eliminar} eliminado del sistema.', 'success')
+                
+        return redirect(url_for('usuarios'))
+        
+    # Consultar la lista de roles para mostrar en la tabla
+    lista_roles = RolUsuario.query.all()
+    return render_template('usuarios.html', 
+                           roles=lista_roles, 
+                           usuario_actual=session['usuario'],
+                           rol_actual=session.get('rol'))
+
 # --- RUTA PARA ELIMINAR USUARIO ---
 @app.route('/eliminar_usuario/<int:id>')
 def eliminar_usuario(id):
@@ -363,39 +454,7 @@ def editar_usuario(id):
                            areas=lista_areas, 
                            usuario_actual=session['usuario'])
 
-# --- NUEVO MÓDULO: PRIVILEGIOS (USUARIOS) ---
-@app.route('/usuarios', methods=['GET', 'POST'])
-def usuarios():
-    # Validar que el usuario haya iniciado sesión
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
 
-    # Si se envía el formulario para crear un usuario
-    if request.method == 'POST':
-        nuevo_usuario = request.form['usuario']
-        nueva_contra = request.form['contrasena']
-        id_area = request.form.get('id_area')
-
-        # Verificar que el usuario no exista ya en la base de datos
-        if InicioLog.query.filter_by(usuario=nuevo_usuario).first():
-            flash('Error: El nombre de usuario ya existe.', 'error')
-        else:
-            # Crear y guardar el nuevo usuario
-            nuevo_registro = InicioLog(usuario=nuevo_usuario, contrasena=nueva_contra, id_area=id_area)
-            db.session.add(nuevo_registro)
-            db.session.commit()
-            flash('Usuario registrado exitosamente.', 'success')
-            
-        return redirect(url_for('usuarios'))
-
-    # Si entramos normalmente (GET), obtenemos la lista de usuarios y áreas
-    lista_usuarios = InicioLog.query.all()
-    lista_areas = Area.query.all()
-    
-    return render_template('usuarios.html', 
-                           usuarios=lista_usuarios, 
-                           areas=lista_areas, 
-                           usuario_actual=session['usuario'])
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

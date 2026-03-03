@@ -15,14 +15,14 @@
         .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
         
         /* Estilos de las tarjetas de resumen */
-        .resumen-container { display: flex; gap: 20px; margin-bottom: 20px; }
-        .resumen-card { flex: 1; padding: 20px; background: white; border-radius: 8px; border-left: 5px solid #007bff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+        .resumen-container { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .resumen-card { flex: 1; min-width: 200px; padding: 20px; background: white; border-radius: 8px; border-left: 5px solid #007bff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
         .resumen-card h4 { margin: 0 0 10px 0; color: #6c757d;}
         .resumen-card h2 { margin: 0; color: #343a40; }
 
         /* Estructura para las gráficas */
-        .charts-container { display: flex; gap: 20px; }
-        .chart-box { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .charts-container { display: flex; gap: 20px; flex-wrap: wrap; }
+        .chart-box { flex: 1; min-width: 300px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
@@ -33,16 +33,17 @@
         <a href="/productos">Productos</a>
         <a href="/procesos">Procesos</a>
         <a href="/ventas">Ventas y Clientes</a>
-        <a href="/contabilidad">Administración Contable</a>
-        <a href="/usuarios">Privilegios (Usuarios)</a>
-        
+        {% if session.get('rol') == 'Administrador' %}
+            <a href="/contabilidad">Administración Contable</a>
+            <a href="/usuarios">Privilegios (Usuarios)</a>
+        {% endif %}
     </div>
 
     <div class="main">
         <div class="topbar">
             <h3>Panel de Control Principal</h3>
             <div>
-                <span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | 
+                <span>Bienvenido, <strong>{{ usuario_actual }}</strong> ({{ session.get('rol') }})</span> | 
                 <a href="/logout" class="btn-logout">Cerrar Sesión</a>
             </div>
         </div>
@@ -63,10 +64,12 @@
         </div>
 
         <div class="charts-container">
+            {% if session.get('rol') == 'Administrador' %}
             <div class="chart-box" style="flex: 0.5;">
                 <h4 style="text-align: center;">Resumen Contable</h4>
                 <canvas id="graficaFinanzas"></canvas>
             </div>
+            {% endif %}
             
             <div class="chart-box">
                 <h4 style="text-align: center;">Movimiento de Inventarios</h4>
@@ -76,27 +79,31 @@
     </div>
 
     <script>
-        // Obtener los datos desde Flask (Python) hacia Javascript
-        const ingresos = {{ total_ingresos }};
-        const egresos = {{ total_egresos }};
+        // Obtener los datos comunes
         const metal = {{ total_metal }};
         const productos = {{ total_productos }};
 
-        // 1. DIBUJAR GRÁFICA DE DONA (Finanzas)
-        const ctxFinanzas = document.getElementById('graficaFinanzas').getContext('2d');
-        new Chart(ctxFinanzas, {
-            type: 'doughnut',
-            data: {
-                labels: ['Ingresos', 'Egresos'],
-                datasets: [{
-                    data: [ingresos, egresos],
-                    backgroundColor: ['#28a745', '#dc3545'], // Verde y Rojo
-                    borderWidth: 1
-                }]
-            }
-        });
+        // MAGIA 3: Javascript condicionado (Solo si es Admin procesa esta gráfica)
+        {% if session.get('rol') == 'Administrador' %}
+            const ingresos = {{ total_ingresos }};
+            const egresos = {{ total_egresos }};
+            
+            // 1. DIBUJAR GRÁFICA DE DONA (Finanzas)
+            const ctxFinanzas = document.getElementById('graficaFinanzas').getContext('2d');
+            new Chart(ctxFinanzas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ingresos', 'Egresos'],
+                    datasets: [{
+                        data: [ingresos, egresos],
+                        backgroundColor: ['#28a745', '#dc3545'], // Verde y Rojo
+                        borderWidth: 1
+                    }]
+                }
+            });
+        {% endif %}
 
-        // 2. DIBUJAR GRÁFICA DE BARRAS (Inventarios)
+        // 2. DIBUJAR GRÁFICA DE BARRAS (Inventarios) - Visible para todos
         const ctxInventario = document.getElementById('graficaInventario').getContext('2d');
         new Chart(ctxInventario, {
             type: 'bar',
