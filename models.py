@@ -93,3 +93,26 @@ class Transaccion(db.Model):
     concepto = db.Column(db.String(255), nullable=False) # Ej. 'Venta de palas', 'Pago a proveedor'
     monto = db.Column(db.Float, nullable=False)
     fecha_transaccion = db.Column(db.Date, nullable=False)
+
+# ==========================================
+# 5. MÓDULO DE VENTAS Y CLIENTES (CRM)
+# ==========================================
+class Cliente(db.Model):
+    __tablename__ = 'cliente'
+    id_cliente = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nombre_contacto = db.Column(db.String(150), nullable=False)
+    empresa = db.Column(db.String(150), nullable=False) # Ej. "Ferretería El Tornillo"
+    telefono = db.Column(db.String(50), nullable=True)
+
+class Venta(db.Model):
+    __tablename__ = 'venta'
+    id_venta = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_cliente = db.Column(db.Integer, db.ForeignKey('cliente.id_cliente'), nullable=False)
+    id_producto = db.Column(db.Integer, db.ForeignKey('producto.id_producto'), nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False)
+    total_venta = db.Column(db.Float, nullable=False)
+    fecha_venta = db.Column(db.Date, nullable=False)
+
+    # Relaciones para conectar la venta con el cliente y el producto
+    cliente = db.relationship('Cliente', backref='compras', lazy=True)
+    producto = db.relationship('Producto', backref='ventas', lazy=True)

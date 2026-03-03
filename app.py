@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion
+from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
@@ -247,7 +247,71 @@ def contabilidad():
                            total_egresos=total_egresos,
                            balance=balance,
                            usuario_actual=session['usuario'])
-
+# --- MÓDULO DE VENTAS Y CLIENTES (CRM) ---
+@app.route('/ventas', methods=['GET', 'POST'])
+def ventas():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        if 'form_cliente' in request.form:
+            # 1. Guardar nuevo cliente
+            nuevo_cliente = Cliente(
+                nombre_contacto=request.form['nombre'],
+                empresa=request.form['empresa'],
+                telefono=request.form['telefono']
+            )
+            db.session.add(nuevo_cliente)
+            db.session.commit()
+            flash('Cliente registrado exitosamente.', 'success')
+            
+        elif 'form_venta' in request.form:
+            # 2. Guardar nueva venta
+            id_cliente = request.form['id_cliente']
+            id_producto = request.form['id_producto']
+            cantidad = request.form['cantidad']
+            total_venta = float(request.form['total_venta'])
+            fecha = request.form['fecha_venta']
+            
+            nueva_venta = Venta(
+                id_cliente=id_cliente,
+                id_producto=id_producto,
+                cantidad=cantidad,
+                total_venta=total_venta,
+                fecha_venta=fecha
+            )
+            db.session.add(nueva_venta)
+            
+            # --- NUEVO: AUTOMATIZACIÓN CONTABLE ---
+            # Consultamos el nombre del cliente y producto para que el recibo quede bonito
+            cliente = Cliente.query.get(id_cliente)
+            producto = Producto.query.get(id_producto)
+            concepto_ingreso = f"Venta autom.: {cantidad} {producto.nombre_producto} a {cliente.empresa}"
+            
+            # Creamos el ingreso directamente en la contabilidad
+            nuevo_ingreso = Transaccion(
+                tipo='Ingreso',
+                concepto=concepto_ingreso,
+                monto=total_venta,
+                fecha_transaccion=fecha
+            )
+            db.session.add(nuevo_ingreso)
+            # --------------------------------------
+            
+            db.session.commit()
+            flash('Venta registrada y dinero sumado a contabilidad exitosamente.', 'success')
+            
+        return redirect(url_for('ventas'))
+        
+    lista_clientes = Cliente.query.all()
+    lista_ventas = Venta.query.all()
+    catalogo_productos = Producto.query.all()
+    
+    return render_template('ventas.html', 
+                           clientes=lista_clientes, 
+                           ventas=lista_ventas,
+                           productos=catalogo_productos,
+                           usuario_actual=session['usuario'])
 # Ruta para cerrar sesión
 @app.route('/logout')
 def logout():
