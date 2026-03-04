@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ecodata - Privilegios</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
+        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
+        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
+        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
+        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
+        .main { flex: 1; padding: 20px; overflow-y: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
+        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
+        
+        /* Estilos de formulario */
+        .form-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;}
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; min-width: 200px;}
+        
+        /* Botones */
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
+        .btn-save { background-color: #28a745; }
+        .btn-save:hover { background-color: #218838; }
+        .btn-delete { background-color: #dc3545; padding: 6px 10px; font-size: 0.9em;}
+        .btn-delete:hover { background-color: #c82333; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; vertical-align: middle;}
+        th { background-color: #343a40; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        
+        .badge { padding: 5px 10px; border-radius: 15px; font-size: 0.9em; font-weight: bold; color: white;}
+        .bg-admin { background-color: #007bff; }
+        .bg-operador { background-color: #6c757d; }
+        
+        .msg { margin-bottom: 15px; font-weight: bold; padding: 10px; border-radius: 4px;}
+        .msg.success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
+        .msg.error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb;}
+        
+        .help-text { font-size: 0.85em; color: #6c757d; margin-top: -5px; display: block; margin-bottom: 15px;}
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>ECODATA</h2>
+        <a href="/dashboard">Inicio</a>
+        <a href="/resumen">📊 Resumen Visual</a>
+        <a href="/bodegas">Bodegas</a>
+        <a href="/productos">Productos</a>
+        <a href="/procesos">Procesos</a>
+        <a href="/ventas">Ventas y Clientes</a>
+        {% if session.get('rol') == 'Administrador' %}
+            <a href="/contabilidad">Administración Contable</a>
+            <a href="/usuarios" class="active">Privilegios (Usuarios)</a>
+        {% endif %}
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <h3>Gestión de Usuarios del Sistema</h3>
+            <div>
+                <span>Bienvenido, <strong>{{ usuario_actual }}</strong> ({{ rol_actual }})</span> | 
+                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="msg {{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h4>Crear Nuevo Usuario o Editar Existente</h4>
+            <span class="help-text">Si escribes un nombre de usuario que ya existe, se actualizarán sus datos. Si es nuevo, se creará.</span>
+            
+            <form method="POST" action="/usuarios">
+                <input type="hidden" name="accion" value="guardar">
+                
+                <div class="form-row">
+                    <input type="text" name="nombre_usuario" placeholder="Nombre de usuario" required>
+                    <input type="password" name="password" placeholder="Contraseña (Mínimo 5 caracteres)" minlength="5">
+                    
+                    <select name="rol" required>
+                        <option value="Operador">Operador (Solo almacén y ventas)</option>
+                        <option value="Administrador">Administrador (Acceso total)</option>
+                    </select>
+
+                    <button type="submit" class="btn btn-save">Guardar Usuario</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h4>Directorio de Usuarios</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre de Usuario</th>
+                        <th>Nivel de Acceso (Rol)</th>
+                        <th style="text-align: center; width: 120px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in roles %}
+                    <tr>
+                        <td style="font-weight: bold;">{{ r.nombre_usuario }}</td>
+                        <td>
+                            <span class="badge {% if r.rol == 'Administrador' %}bg-admin{% else %}bg-operador{% endif %}">
+                                {{ r.rol }}
+                            </span>
+                        </td>
+                        <td style="text-align: center;">
+                            <form method="POST" action="/usuarios" style="margin: 0;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este usuario por completo?');">
+                                <input type="hidden" name="accion" value="eliminar">
+                                <input type="hidden" name="nombre_usuario" value="{{ r.nombre_usuario }}">
+                                <button type="submit" class="btn btn-delete">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ecodata - Resumen Estadístico</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Tu diseño base intocable */
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
+        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
+        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
+        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
+        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
+        .main { flex: 1; padding: 20px; overflow-y: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
+        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
+        
+        /* Estilos para acomodar las gráficas */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Dos columnas de gráficas */
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .chart-card h4 {
+            margin-top: 0;
+            color: #343a40;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        /* Ajuste para pantallas pequeñas */
+        @media (max-width: 900px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>ECODATA</h2>
+        <a href="/dashboard">Inicio</a>
+        <a href="/resumen" class="active">📊 Resumen Visual</a>
+        <a href="/proveedores">Proveedores</a>
+        <a href="/compras">Compras</a>
+        <a href="/bodegas">Bodegas</a>
+        <a href="/productos">Productos</a>
+        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
+        <a href="/procesos">Procesos</a>
+        <a href="/ventas">Ventas y Clientes</a>
+        <a href="/contabilidad">Administración Contable</a>
+        <a href="/usuarios">Privilegios (Usuarios)</a>
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <h3>Dashboard Ejecutivo - Resumen Global</h3>
+            <div>
+                <span>Bienvenido, <strong>{{ session.get('usuario', 'Usuario') }}</strong></span> | 
+                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h4>Flujo Financiero Global</h4>
+                <canvas id="graficaFinanciera"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h4>Distribución de Metales en Bodega</h4>
+                <canvas id="graficaInventario"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h4>Estado de Procesos</h4>
+                <canvas id="graficaProcesos"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h4>Gastos por Proveedor</h4>
+                <canvas id="graficaProveedores"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. DATOS INYECTADOS DESDE LA BASE DE DATOS (PYTHON) ---
+        const nombresProv = {{ nombres_prov | tojson }};
+        const totalesProv = {{ totales_prov | tojson }};
+        
+        const nombresMetal = {{ nombres_metal | tojson }};
+        const cantidadesMetal = {{ cantidades_metal | tojson }};
+        
+        const estadosProc = {{ estados_proc | tojson }};
+        const cantidadesProc = {{ cantidades_proc | tojson }};
+        
+        const totalCompras = {{ total_compras | tojson }};
+        const totalVentas = {{ total_ventas | tojson }};
+
+        // --- 2. CONFIGURACIÓN DE LAS GRÁFICAS ---
+
+        // Gráfica 1: Barras (Flujo Financiero Global)
+        const ctxFinanzas = document.getElementById('graficaFinanciera').getContext('2d');
+        new Chart(ctxFinanzas, {
+            type: 'bar',
+            data: {
+                labels: ['Balance Financiero'],
+                datasets: [
+                    {
+                        label: 'Total Gastado (Compras)',
+                        data: [totalCompras],
+                        backgroundColor: '#dc3545' // Rojo para gastos
+                    },
+                    {
+                        label: 'Total Ingresado (Ventas)',
+                        data: [totalVentas],
+                        backgroundColor: '#28a745' // Verde para ingresos
+                    }
+                ]
+            }
+        });
+
+        // Gráfica 2: Dona (Inventario Real de Metales)
+        const ctxInventario = document.getElementById('graficaInventario').getContext('2d');
+        new Chart(ctxInventario, {
+            type: 'doughnut',
+            data: {
+                // Si no hay datos, mostramos "Sin Inventario"
+                labels: nombresMetal.length > 0 ? nombresMetal : ['Sin Inventario'],
+                datasets: [{
+                    data: cantidadesMetal.length > 0 ? cantidadesMetal : [1],
+                    backgroundColor: ['#adb5bd', '#fd7e14', '#495057', '#d0a85c', '#17a2b8', '#6610f2']
+                }]
+            }
+        });
+
+        // Gráfica 3: Pastel (Estado de los Procesos)
+        const ctxProcesos = document.getElementById('graficaProcesos').getContext('2d');
+        new Chart(ctxProcesos, {
+            type: 'pie',
+            data: {
+                labels: estadosProc.length > 0 ? estadosProc : ['Sin Procesos'],
+                datasets: [{
+                    data: cantidadesProc.length > 0 ? cantidadesProc : [1],
+                    backgroundColor: ['#17a2b8', '#28a745'] // Azul y verde
+                }]
+            }
+        });
+
+        // Gráfica 4: Polar (Gastos reales por Proveedor)
+        const ctxProveedores = document.getElementById('graficaProveedores').getContext('2d');
+        new Chart(ctxProveedores, {
+            type: 'polarArea',
+            data: {
+                labels: nombresProv.length > 0 ? nombresProv : ['Sin Proveedores'],
+                datasets: [{
+                    data: totalesProv.length > 0 ? totalesProv : [1],
+                    backgroundColor: ['#007bff', '#6610f2', '#e83e8c', '#fd7e14', '#20c997']
+                }]
+            }
+        });
+    </script>
+</body>
+</html>

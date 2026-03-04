@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ecodata - Contabilidad</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
+        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
+        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
+        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
+        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
+        .main { flex: 1; padding: 20px; overflow-y: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
+        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
+        
+        /* Tarjetas de Resumen Financiero */
+        .resumen-container { display: flex; gap: 20px; margin-bottom: 20px; }
+        .resumen-card { flex: 1; padding: 20px; border-radius: 8px; color: white; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+        .resumen-ingresos { background-color: #28a745; }
+        .resumen-egresos { background-color: #dc3545; }
+        .resumen-balance { background-color: #007bff; }
+        .resumen-card h4 { margin: 0 0 10px 0; font-size: 1.2em; font-weight: normal;}
+        .resumen-card h2 { margin: 0; font-size: 2em; }
+
+        input, select { padding: 10px; margin-right: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 4px; }
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
+        .btn-add { background-color: #6f42c1; }
+        .btn-add:hover { background-color: #59339d; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #343a40; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        
+        .text-ingreso { color: #28a745; font-weight: bold; }
+        .text-egreso { color: #dc3545; font-weight: bold; }
+        
+        .msg { margin-bottom: 10px; font-weight: bold; padding: 10px; border-radius: 4px;}
+        .msg.success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>ECODATA</h2>
+        <a href="/dashboard">Inicio</a>
+        <a href="/resumen">📊 Resumen Visual</a>
+        <a href="/bodegas">Bodegas</a>
+        <a href="/productos">Productos</a>
+        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
+        <a href="/procesos">Procesos</a>
+        <a href="/ventas">Ventas y Clientes</a>
+        <a href="/contabilidad" class="active">Administración Contable</a>
+        <a href="/usuarios">Privilegios (Usuarios)</a>
+        
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <h3>Administración Contable</h3>
+            <div>
+                <span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | 
+                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+            </div>
+        </div>
+
+        <div class="resumen-container">
+            <div class="resumen-card resumen-ingresos">
+                <h4>Total Ingresos</h4>
+                <h2>${{ "%.2f"|format(total_ingresos) }}</h2>
+            </div>
+            <div class="resumen-card resumen-egresos">
+                <h4>Total Egresos</h4>
+                <h2>${{ "%.2f"|format(total_egresos) }}</h2>
+            </div>
+            <div class="resumen-card resumen-balance">
+                <h4>Balance General</h4>
+                <h2>${{ "%.2f"|format(balance) }}</h2>
+            </div>
+        </div>
+
+        <div class="card">
+            <h4>Registrar Nueva Transacción</h4>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="msg {{ category }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="/contabilidad">
+                <select name="tipo" required>
+                    <option value="">-- Tipo de Movimiento --</option>
+                    <option value="Ingreso">Ingreso (Ventas, Inversiones)</option>
+                    <option value="Egreso">Egreso (Compras, Gastos, Nómina)</option>
+                </select>
+
+                <input type="text" name="concepto" placeholder="Concepto (Ej. Pago a proveedor)" required style="width: 250px;">
+                <input type="number" step="0.01" name="monto" placeholder="Monto ($)" required>
+                <input type="date" name="fecha_transaccion" required>
+
+                <button type="submit" class="btn btn-add">Guardar Transacción</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h4>Libro Mayor (Historial de Movimientos)</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Fecha</th>
+                        <th>Concepto</th>
+                        <th>Tipo</th>
+                        <th>Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transacciones %}
+                    <tr>
+                        <td>{{ t.id_transaccion }}</td>
+                        <td>{{ t.fecha_transaccion }}</td>
+                        <td>{{ t.concepto }}</td>
+                        <td class="{% if t.tipo == 'Ingreso' %}text-ingreso{% else %}text-egreso{% endif %}">
+                            {{ t.tipo }}
+                        </td>
+                        <td>${{ "%.2f"|format(t.monto) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center;">No hay transacciones registradas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

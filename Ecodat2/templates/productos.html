@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ecodata - Catálogo de Productos</title>
+    <style>
+        /* Tu diseño base intocable */
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
+        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
+        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
+        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
+        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
+        .main { flex: 1; padding: 20px; overflow-y: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
+        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
+        input, textarea { padding: 10px; margin-right: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;}
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
+        .btn-add { background-color: #17a2b8; }
+        .btn-add:hover { background-color: #138496; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #343a40; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>ECODATA</h2>
+        <a href="/dashboard">Inicio</a>
+        <a href="/resumen">📊 Resumen Visual</a>
+        <a href="/proveedores">Proveedores</a>
+        <a href="/compras">Compras</a>
+        <a href="/bodegas">Bodegas</a>
+        <a href="/productos" class="active">Productos</a>
+        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
+        <a href="/procesos">Procesos</a>
+        <a href="/ventas">Ventas y Clientes</a>
+        <a href="/contabilidad">Administración Contable</a>
+        <a href="/usuarios">Privilegios (Usuarios)</a>
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <h3>Catálogo Base de Productos</h3>
+            <div>
+                <span>Bienvenido, <strong>{{ session.get('usuario', 'Usuario') }}</strong></span> | 
+                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h4>Registrar Nuevo Producto Base</h4>
+            <p style="color: #666; font-size: 0.9em; margin-top: 0;"></p>
+            <form action="{{ url_for('gestionar_productos') }}" method="POST">
+                <input type="text" name="nombre_producto" placeholder="Nombre (Ej. Perfil de Aluminio)" required style="width: 250px;">
+                <input type="text" name="descripcion" placeholder="Descripción o características" style="width: 400px;">
+                <button type="submit" class="btn btn-add">Guardar en Catálogo</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h4>Directorio de Productos</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">ID</th>
+                        <th>Nombre del Producto</th>
+                        <th>Descripción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prod in productos %}
+                    <tr>
+                        <td>{{ prod.id_producto }}</td>
+                        <td><strong>{{ prod.nombre_producto }}</strong></td>
+                        <td>{{ prod.descripcion }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center;">Aún no hay productos base en el catálogo.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
