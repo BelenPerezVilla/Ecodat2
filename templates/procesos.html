@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Ecodata - Procesos</title>
+    <title>Ecodata - Procesos de Fabricación</title>
     <style>
         body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
         .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
@@ -10,119 +10,122 @@
         .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
         .sidebar a:hover, .sidebar a.active { background-color: #495057; }
         .main { flex: 1; padding: 20px; overflow-y: auto; }
+        
         .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
         .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
         
         .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
-        input, select { padding: 10px; margin-right: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 4px; }
+        input, select { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;}
         .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
-        .btn-add { background-color: #17a2b8; }
-        .btn-add:hover { background-color: #138496; }
+        .btn-add { background-color: #28a745; }
+        .btn-add:hover { background-color: #218838; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
         th { background-color: #343a40; color: white; }
         tr:nth-child(even) { background-color: #f2f2f2; }
         
-        .badge { padding: 5px 10px; border-radius: 15px; font-size: 0.9em; font-weight: bold; color: white;}
-        .bg-progreso { background-color: #ffc107; color: black;}
-        .bg-terminado { background-color: #28a745; }
-        
-        .msg { margin-bottom: 10px; font-weight: bold; padding: 10px; border-radius: 4px;}
-        .msg.success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
+        .alert { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <h2>ECODATA</h2>
         <a href="/dashboard">Inicio</a>
-        <a href="/bodegas">Bodegas</a>
-        <a href="/productos">Productos</a>
-        <a href="/procesos" class="active">Procesos</a>
+        <a href="/almacenes">Gestión de Almacenes</a>
+        <a href="/bodegas">Bodegas (Materia Prima)</a>
+        <a href="/productos">↳ Catálogo Base</a>
+        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
+        <a href="/procesos" class="active">Procesos de Fabricación</a>
         <a href="/ventas">Ventas y Clientes</a>
         <a href="/contabilidad">Administración Contable</a>
-        <a href="/usuarios">Privilegios (Usuarios)</a>
-        
+        <a href="/usuarios">Gestión de Usuarios</a>
     </div>
 
     <div class="main">
         <div class="topbar">
-            <h3>Gestión de Procesos de Fabricación</h3>
+            <h3>Procesos de Fabricación</h3>
             <div>
                 <span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | 
                 <a href="/logout" class="btn-logout">Cerrar Sesión</a>
             </div>
         </div>
 
-        <div class="card">
-            <h4>Iniciar Nuevo Proceso</h4>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
                 {% for category, message in messages %}
-                  <div class="msg {{ category }}">{{ message }}</div>
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
                 {% endfor %}
-              {% endif %}
-            {% endwith %}
+            {% endif %}
+        {% endwith %}
 
-            <form method="POST" action="/procesos">
-                <input type="text" name="nombre_proceso" placeholder="Nombre (Ej. Fundición Lote 1)" required style="width: 250px;">
+        <div class="card">
+            <h4>Registrar Nuevo Proceso de Fabricación</h4>
+            <form action="{{ url_for('procesos') }}" method="POST">
+                <input type="text" name="nombre_proceso" placeholder="Nombre (Ej. Lote Palas A)" required style="width: 200px;">
                 
-                <select name="id_metal" required>
-                    <option value="">-- Lote de Materia Prima --</option>
-                    {% for metal in metales %}
-                        <option value="{{ metal.id_inventario_m }}">Lote #{{ metal.id_inventario_m }} - {{ metal.tipo_metal }} ({{ metal.cantidad_kg }}Kg)</option>
+                <select name="id_metal" required style="width: 250px;">
+                    <option value="" disabled selected>-- Lote de Materia Prima --</option>
+                    {% for m in metales %}
+                        <option value="{{ m.id_inventario_m }}">Lote #{{ m.id_inventario_m }} - {{ m.tipo_metal }} ({{ m.cantidad_kg }} kg)</option>
                     {% endfor %}
                 </select>
 
-                <select name="id_producto" required>
-                    <option value="">-- Herramienta a Fabricar --</option>
-                    {% for prod in productos %}
-                        <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
+                <select name="id_producto" required style="width: 250px;">
+                    <option value="" disabled selected>-- Producto a Fabricar --</option>
+                    {% for p in productos %}
+                        <option value="{{ p.id_producto }}">{{ p.nombre_producto }}</option>
                     {% endfor %}
                 </select>
 
-                <select name="estado" required>
-                    <option value="En progreso">En progreso</option>
-                    <option value="Terminado">Terminado</option>
+                <select name="estado" required style="width: 150px; background-color: #e9ecef;">
+                    <option value="En progreso" selected>En progreso</option>
                 </select>
 
                 <input type="date" name="fecha_inicio" required>
-
-                <button type="submit" class="btn btn-add">Registrar Proceso</button>
+                
+                <button type="submit" class="btn btn-add">Iniciar Proceso</button>
             </form>
         </div>
 
         <div class="card">
-            <h4>Seguimiento de Fabricación</h4>
+            <h4>Historial y Control de Procesos</h4>
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Nombre del Proceso</th>
                         <th>Materia Prima Usada</th>
-                        <th>Producto Destino</th>
+                        <th>Producto Esperado</th>
                         <th>Fecha de Inicio</th>
-                        <th>Estado</th>
+                        <th style="width: 250px;">Estado y Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for proc in procesos %}
                     <tr>
-                        <td>{{ proc.id_proceso }}</td>
-                        <td>{{ proc.nombre_proceso }}</td>
-                        <td>Lote #{{ proc.metal.id_inventario_m }} ({{ proc.metal.tipo_metal }})</td>
+                        <td><strong>{{ proc.nombre_proceso }}</strong></td>
+                        <td>{{ proc.metal.tipo_metal }} (Lote #{{ proc.id_inventario_m }})</td>
                         <td>{{ proc.producto_final.nombre_producto }}</td>
                         <td>{{ proc.fecha_inicio }}</td>
                         <td>
-                            <span class="badge {% if proc.estado == 'Terminado' %}bg-terminado{% else %}bg-progreso{% endif %}">
-                                {{ proc.estado }}
-                            </span>
+                            {% if proc.estado == 'En progreso' %}
+                                <span style="color: #d39e00; font-weight: bold;">En Progreso ⏳</span>
+                                
+                                <form action="{{ url_for('completar_proceso', id=proc.id_proceso) }}" method="POST" style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ced4da;">
+                                    <input type="number" step="0.1" name="kg_usados" placeholder="Kg usados" required style="width: 100px; padding: 5px; margin-bottom: 5px;">
+                                    <input type="number" name="piezas_creadas" placeholder="Piezas listas" required style="width: 100px; padding: 5px; margin-bottom: 5px;"><br>
+                                    <button type="submit" class="btn btn-add" style="font-size: 0.8em; padding: 6px 10px; width: 100%;">✔ Terminar Producción</button>
+                                </form>
+                            {% else %}
+                                <span style="color: #28a745; font-weight: bold;">Terminado ✔</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" style="text-align: center;">No hay procesos activos registrados.</td>
+                        <td colspan="5" style="text-align: center;">No hay procesos registrados aún.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

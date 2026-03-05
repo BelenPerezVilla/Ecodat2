@@ -3,6 +3,7 @@ from models import db, Area, InicioLog, Proveedor, Almacen, Producto, Inventario
 from urllib.parse import quote_plus
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.security import generate_password_hash
+from datetime import date
 
 app = Flask(__name__)
 app.secret_key = 'hola123' # Necesario para las sesiones
@@ -164,41 +165,87 @@ def bodegas():
         prod2 = Producto(nombre_producto="Pico de Construcción", descripcion="Pico estándar")
         db.session.add_all([prod1, prod2])
         db.session.commit()
-# --- MÓDULO PRODUCTOS / INVENTARIO DE HERRAMIENTAS ---
-@app.route('/productos', methods=['GET', 'POST'])
-def productos():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-        
+# --- RUTAS NUEVAS PARA LA AUTOMATIZACIÓN Y ALMACENES ---
+
+# 1. RUTA DEL NUEVO MÓDULO DE ALMACENES
+@app.route('/almacenes', methods=['GET', 'POST'])
+def almacenes():
+    if 'usuario' not in session: return redirect(url_for('login'))
+    
     if request.method == 'POST':
-        id_producto = request.form.get('id_producto')
-        id_almacen = request.form.get('id_almacen')
-        cantidad = request.form['cantidad']
-        fecha = request.form['fecha_fabricacion']
-        
-        # Registrar la nueva producción en el inventario
-        nueva_produccion = InventarioProducto(
-            id_producto=id_producto,
-            id_almacen=id_almacen,
-            cantidad_stock=cantidad,
-            fecha_fabricacion=fecha
-        )
-        db.session.add(nueva_produccion)
+        nombre = request.form['nombre_almacen']
+        ubicacion = request.form['ubicacion']
+        nuevo = Almacen(nombre_almacen=nombre, ubicacion=ubicacion)
+        db.session.add(nuevo)
         db.session.commit()
+        flash('Almacén registrado.', 'success')
+        return redirect(url_for('almacenes'))
         
-        flash('Producción de herramientas registrada exitosamente.', 'success')
-        return redirect(url_for('productos'))
+    lista_almacenes = Almacen.query.all()
+    return render_template('almacenes.html', almacenes=lista_almacenes, usuario_actual=session['usuario'])
+
+# 2. ACTUALIZACIÓN DE INVENTARIO PARA ENVIARLE LA LISTA DE ALMACENES (Opción A)
+@app.route('/inventario_productos', methods=['GET', 'POST'])
+def inventario_productos():
+    if 'usuario' not in session: return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        id_producto = request.form['id_producto']
+        cantidad_nueva = int(request.form['cantidad'])
+        id_almacen = int(request.form['id_almacen']) 
         
-    # Obtener datos para mostrar en la pantalla
+        inventario_actual = InventarioProducto.query.filter_by(id_producto=id_producto, id_almacen=id_almacen).first()
+        if inventario_actual:
+            inventario_actual.cantidad_stock += cantidad_nueva
+            inventario_actual.fecha_fabricacion = date.today()
+        else:
+            nueva_produccion = InventarioProducto(id_producto=id_producto, id_almacen=id_almacen, cantidad_stock=cantidad_nueva, fecha_fabricacion=date.today())
+            db.session.add(nueva_produccion)
+            
+        db.session.commit()
+        return redirect(url_for('inventario_productos'))
+        
+    # AQUÍ ENVIAMOS LOS ALMACENES AL HTML PARA EL MENÚ DESPLEGABLE
     inventario_prod = InventarioProducto.query.all()
     lista_productos = Producto.query.all()
-    almacenes = Almacen.query.all()
+    lista_almacenes = Almacen.query.all() 
     
-    return render_template('productos.html', 
-                           inventario=inventario_prod, 
-                           productos=lista_productos, 
-                           almacenes=almacenes,
-                           usuario_actual=session['usuario'])
+    return render_template('inventario_productos.html', inventarios=inventario_prod, productos=lista_productos, almacenes=lista_almacenes, usuario_actual=session['usuario'])
+
+# 3. RUTA DE AUTOMATIZACIÓN DE PROCESOS (Opción B)
+@app.route('/completar_proceso/<int:id>', methods=['POST'])
+def completar_proceso(id):
+    if 'usuario' not in session: return redirect(url_for('login'))
+    
+    proceso = Proceso.query.get_or_404(id)
+    kg_usados = float(request.form['kg_usados'])
+    piezas_creadas = int(request.form['piezas_creadas'])
+    
+    # PASO 1: Restar el metal del inventario de Materia Prima
+    lote_metal = InventarioMetal.query.get(proceso.id_inventario_m)
+    if lote_metal.cantidad_kg >= kg_usados:
+        lote_metal.cantidad_kg -= kg_usados
+    else:
+        flash('Error: No hay suficiente metal en este lote para esta fabricación.', 'error')
+        return redirect(url_for('procesos'))
+        
+    # PASO 2: Sumar las herramientas creadas al Inventario de Productos
+    id_almacen = lote_metal.id_almacen # Se guarda en el mismo almacén donde estaba el metal
+    inv_prod = InventarioProducto.query.filter_by(id_producto=proceso.id_producto, id_almacen=id_almacen).first()
+    
+    if inv_prod:
+        inv_prod.cantidad_stock += piezas_creadas
+        inv_prod.fecha_fabricacion = date.today()
+    else:
+        nuevo_inv = InventarioProducto(id_producto=proceso.id_producto, id_almacen=id_almacen, cantidad_stock=piezas_creadas, fecha_fabricacion=date.today())
+        db.session.add(nuevo_inv)
+        
+    # PASO 3: Marcar el proceso como Terminado
+    proceso.estado = 'Terminado'
+    db.session.commit()
+    
+    flash('¡Fabricación exitosa! Se restó el metal y se sumaron los productos automáticamente.', 'success')
+    return redirect(url_for('procesos'))
 # --- MÓDULO PROCESOS DE FABRICACIÓN ---
 @app.route('/procesos', methods=['GET', 'POST'])
 def procesos():
@@ -344,6 +391,30 @@ def ventas():
                            ventas=lista_ventas,
                            productos=catalogo_productos,
                            usuario_actual=session['usuario'])
+
+# --- MÓDULO DIRECTORIO DE PROVEEDORES ---
+@app.route('/proveedores', methods=['GET', 'POST'])
+def proveedores():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        nombre = request.form['nombre']
+        telefono = request.form['telefono']
+        
+        nuevo_prov = Proveedor(nombre=nombre, telefono=telefono)
+        db.session.add(nuevo_prov)
+        db.session.commit()
+        
+        flash('Proveedor registrado exitosamente.', 'success')
+        return redirect(url_for('proveedores'))
+        
+    lista_proveedores = Proveedor.query.all()
+    return render_template('proveedores.html', 
+                           proveedores=lista_proveedores, 
+                           usuario_actual=session['usuario'])
+
+
 # --- MÓDULO DE PRIVILEGIOS Y GESTIÓN DE USUARIOS ---
 @app.route('/usuarios', methods=['GET', 'POST'])
 def usuarios():

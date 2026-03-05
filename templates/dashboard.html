@@ -29,8 +29,9 @@
     <div class="sidebar">
         <h2>ECODATA</h2>
         <a href="/dashboard" class="active">Inicio</a>
-        <a href="/bodegas">Bodegas</a>
-        <a href="/productos">Productos</a>
+        <a href="/almacenes">Gestión de Almacenes</a> <a href="/bodegas">Bodegas (Materia Prima)</a>
+        <a href="/productos">↳ Catálogo Base</a>
+        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
         <a href="/procesos">Procesos</a>
         <a href="/ventas">Ventas y Clientes</a>
         {% if session.get('rol') == 'Administrador' %}

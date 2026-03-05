@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ecodata - Almacenes</title>
+    <style>
+        /* (Usa el mismo estilo <style> que tienes en inventario_productos.html para ahorrar espacio aquí) */
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
+        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
+        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
+        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
+        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
+        .main { flex: 1; padding: 20px; overflow-y: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
+        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
+        input, button { padding: 10px; margin-right: 10px; border-radius: 4px; border: 1px solid #ccc;}
+        .btn-add { background-color: #28a745; color: white; border: none; font-weight: bold; cursor: pointer;}
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #343a40; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>ECODATA</h2>
+        <a href="/dashboard">Inicio</a>
+        <a href="/almacenes" class="active">Gestión de Almacenes</a>
+        <a href="/bodegas">Bodegas (Materia Prima)</a>
+        <a href="/productos">↳ Catálogo Base</a>
+        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
+        <a href="/procesos">Procesos de Fabricación</a>
+        <a href="/ventas">Ventas y Clientes</a>
+        <a href="/contabilidad">Administración Contable</a>
+        <a href="/usuarios">Gestión de Usuarios</a>
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <h3>Gestión de Almacenes y Bodegas</h3>
+            <div><span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | <a href="/logout" style="color:red; text-decoration:none;">Cerrar Sesión</a></div>
+        </div>
+
+        <div class="card">
+            <h4>Registrar Nuevo Almacén</h4>
+            <form action="{{ url_for('almacenes') }}" method="POST">
+                <input type="text" name="nombre_almacen" placeholder="Nombre (Ej. Bodega Norte)" required style="width: 250px;">
+                <input type="text" name="ubicacion" placeholder="Ubicación (Ej. Nave 2)" required style="width: 250px;">
+                <button type="submit" class="btn-add">Registrar Almacén</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h4>Lista de Almacenes Activos</h4>
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Nombre del Almacén</th><th>Ubicación</th></tr>
+                </thead>
+                <tbody>
+                    {% for alm in almacenes %}
+                    <tr>
+                        <td>{{ alm.id_almacen }}</td>
+                        <td><strong>{{ alm.nombre_almacen }}</strong></td>
+                        <td>{{ alm.ubicacion }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
