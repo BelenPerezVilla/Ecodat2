@@ -1,118 +1,49 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Ecodata - Productos</title>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
-        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
-        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
-        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
-        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
-        .main { flex: 1; padding: 20px; overflow-y: auto; }
-        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
-        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
-        
-        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
-        input, select { padding: 10px; margin-right: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 4px; }
-        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
-        .btn-add { background-color: #007bff; }
-        .btn-add:hover { background-color: #0056b3; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background-color: #343a40; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        
-        .msg { margin-bottom: 10px; font-weight: bold; padding: 10px; border-radius: 4px;}
-        .msg.success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h2>ECODATA</h2>
-        <a href="/dashboard">Inicio</a>
-        <a href="/almacenes">Gestión de Almacenes</a> <a href="/bodegas">Bodegas (Materia Prima)</a>
-        <a href="/productos">↳ Catálogo Base</a>
-        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
-        <a href="/procesos">Procesos de Fabricación</a>
-        <a href="/ventas">Ventas y Clientes</a>
-        <a href="/contabilidad">Administración Contable</a>
-        <a href="/usuarios">Gestión de Usuarios</a>
-        
-    </div>
+{% extends "base.html" %}
 
-    <div class="main">
-        <div class="topbar">
-            <h3>Gestión de Productos Terminados</h3>
-            <div>
-                <span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | 
-                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
-            </div>
-        </div>
+{% block title %}Catálogo de Productos - Ecodata{% endblock %}
 
-        <div class="card">
-            <h4>Registrar Producción de Herramientas</h4>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for category, message in messages %}
-                  <div class="msg {{ category }}">{{ message }}</div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
+{% block content %}
+<style>
+    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    input { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+    .btn-add { background-color: #28a745; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+    th { background-color: #343a40; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+</style>
 
-            <form method="POST" action="/productos">
-                <select name="id_producto" required>
-                    <option value="">-- Seleccione Herramienta --</option>
-                    {% for prod in productos %}
-                        <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
-                    {% endfor %}
-                </select>
+<div class="card">
+    <h4>Registrar Nuevo Producto al Catálogo</h4>
+    <form action="/productos" method="POST">
+        <input type="text" name="nombre_producto" placeholder="Nombre del Producto" required style="width: 300px;">
+        <input type="text" name="descripcion" placeholder="Descripción breve" style="width: 400px;">
+        <button type="submit" class="btn btn-add">Guardar Producto</button>
+    </form>
+</div>
 
-                <select name="id_almacen" required>
-                    <option value="">-- Seleccione Bodega Destino --</option>
-                    {% for alm in almacenes %}
-                        <option value="{{ alm.id_almacen }}">{{ alm.nombre_almacen }}</option>
-                    {% endfor %}
-                </select>
-
-                <input type="number" name="cantidad" placeholder="Cantidad (Piezas)" required>
-                <input type="date" name="fecha_fabricacion" required>
-
-                <button type="submit" class="btn btn-add">Guardar Producción</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h4>Stock de Herramientas Terminadas</h4>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID Lote</th>
-                        <th>Herramienta</th>
-                        <th>Bodega</th>
-                        <th>Piezas Disponibles</th>
-                        <th>Fecha de Fabricación</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in inventario %}
-                    <tr>
-                        <td>{{ item.id_inventario_p }}</td>
-                        <td>{{ item.producto.nombre_producto }}</td>
-                        <td>{{ item.almacen.nombre_almacen }}</td>
-                        <td>{{ item.cantidad_stock }} uds.</td>
-                        <td>{{ item.fecha_fabricacion }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" style="text-align: center;">No hay herramientas registradas en el inventario.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</body>
-</html>
+<div class="card">
+    <h4>Catálogo Base de Productos</h4>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 10%;">ID</th>
+                <th>Nombre del Producto</th>
+                <th>Descripción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prod in productos %}
+            <tr>
+                <td>{{ prod.id_producto }}</td>
+                <td><strong>{{ prod.nombre_producto }}</strong></td>
+                <td>{{ prod.descripcion }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" style="text-align: center;">No hay productos en el catálogo.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,71 +1,182 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Ecodata - Almacenes</title>
-    <style>
-        /* (Usa el mismo estilo <style> que tienes en inventario_productos.html para ahorrar espacio aquí) */
-        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
-        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
-        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
-        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
-        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
-        .main { flex: 1; padding: 20px; overflow-y: auto; }
-        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
-        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
-        input, button { padding: 10px; margin-right: 10px; border-radius: 4px; border: 1px solid #ccc;}
-        .btn-add { background-color: #28a745; color: white; border: none; font-weight: bold; cursor: pointer;}
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background-color: #343a40; color: white; }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h2>ECODATA</h2>
-        <a href="/dashboard">Inicio</a>
-        <a href="/almacenes" class="active">Gestión de Almacenes</a>
-        <a href="/bodegas">Bodegas (Materia Prima)</a>
-        <a href="/productos">↳ Catálogo Base</a>
-        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
-        <a href="/procesos">Procesos de Fabricación</a>
-        <a href="/ventas">Ventas y Clientes</a>
-        <a href="/contabilidad">Administración Contable</a>
-        <a href="/usuarios">Gestión de Usuarios</a>
+{% extends "base.html" %}
+
+{% block title %}Gestión de Almacenes - EcoData{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --primary-dark: #2c3e50;
+        --accent-blue: #3498db;
+        --success-green: #27ae60;
+        --warning-orange: #e67e22;
+        --bg-light: #f4f7f6;
+    }
+
+    .main-container { padding: 30px; background-color: var(--bg-light); min-height: 100vh; }
+    
+    .card-panel {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+        overflow: hidden;
+    }
+
+    .card-header-dark {
+        background: var(--primary-dark);
+        color: white;
+        padding: 18px 25px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        padding: 25px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: #4a5568;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #edf2f7;
+        border-radius: 8px;
+        background: #f8fafc;
+        transition: all 0.3s;
+    }
+
+    .form-input:focus {
+        border-color: var(--accent-blue);
+        background: white;
+        outline: none;
+    }
+
+    .btn-submit {
+        background: var(--accent-blue);
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        margin: 0 25px 25px auto;
+        display: block;
+        transition: 0.3s;
+    }
+
+    .btn-submit:hover { background: #2980b9; }
+
+    .custom-table { width: 100%; border-collapse: collapse; }
+    .custom-table th { text-align: left; padding: 15px; border-bottom: 2px solid #edf2f7; color: #718096; font-size: 0.8rem; text-transform: uppercase; }
+    .custom-table td { padding: 18px 15px; border-bottom: 1px solid #edf2f7; color: #2d3748; }
+
+    .warehouse-icon {
+        background: #ebf8ff;
+        color: #2b6cb0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 1.2rem;
+    }
+
+    .badge-metal-total {
+        background: #fffaf0;
+        color: var(--warning-orange);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-weight: bold;
+        border: 1px solid #feebc8;
+        display: inline-block;
+    }
+</style>
+
+<div class="main-container">
+    
+    <div class="card-panel">
+        <div class="card-header-dark">
+            <i class="fas fa-warehouse"></i>
+            <h3 style="margin:0; font-size: 1.2rem;">Registrar Nueva Zona / Bodega</h3>
+        </div>
+        <form action="/almacenes" method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nombre del Almacén</label>
+                    <input type="text" name="nombre_almacen" class="form-input" placeholder="Ej. Patio Principal, Bodega Techada..." required>
+                </div>
+                <div class="form-group">
+                    <label>Ubicación Física</label>
+                    <input type="text" name="ubicacion" class="form-input" placeholder="Dirección o referencia interna" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-plus-circle"></i> Guardar Almacén
+            </button>
+        </form>
     </div>
 
-    <div class="main">
-        <div class="topbar">
-            <h3>Gestión de Almacenes y Bodegas</h3>
-            <div><span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | <a href="/logout" style="color:red; text-decoration:none;">Cerrar Sesión</a></div>
+    <div class="card-panel">
+        <div style="padding: 20px 25px; border-bottom: 1px solid #edf2f7;">
+            <h4 style="margin:0; color: var(--primary-dark);"><i class="fas fa-map-marked-alt"></i> Directorio de Instalaciones y Ocupación</h4>
         </div>
-
-        <div class="card">
-            <h4>Registrar Nuevo Almacén</h4>
-            <form action="{{ url_for('almacenes') }}" method="POST">
-                <input type="text" name="nombre_almacen" placeholder="Nombre (Ej. Bodega Norte)" required style="width: 250px;">
-                <input type="text" name="ubicacion" placeholder="Ubicación (Ej. Nave 2)" required style="width: 250px;">
-                <button type="submit" class="btn-add">Registrar Almacén</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h4>Lista de Almacenes Activos</h4>
-            <table>
+        <div style="overflow-x: auto; padding: 0 25px 25px 25px;">
+            <table class="custom-table">
                 <thead>
-                    <tr><th>ID</th><th>Nombre del Almacén</th><th>Ubicación</th></tr>
+                    <tr>
+                        <th>ID</th>
+                        <th>Instalación</th>
+                        <th>Ubicación</th>
+                        <th>Carga Actual (Metales)</th>
+                        <th>Estado</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    {% for alm in almacenes %}
+                    {% for a in almacenes %}
                     <tr>
-                        <td>{{ alm.id_almacen }}</td>
-                        <td><strong>{{ alm.nombre_almacen }}</strong></td>
-                        <td>{{ alm.ubicacion }}</td>
+                        <td style="font-weight: bold; color: #718096;">#ALM-{{ a.id_almacen }}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div class="warehouse-icon"><i class="fas fa-building"></i></div>
+                                <strong>{{ a.nombre_almacen }}</strong>
+                            </div>
+                        </td>
+                        <td><i class="fas fa-map-marker-alt" style="color:#e53e3e"></i> {{ a.ubicacion }}</td>
+                        <td>
+                            <span class="badge-metal-total">
+                                <i class="fas fa-weight-hanging"></i> 
+                                {{ a.inventario_metal | sum(attribute='cantidad_kg') | round(2) }} kg
+                            </span>
+                        </td>
+                        <td>
+                            <span style="background: #c6f6d5; color: #22543d; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold;">
+                                ACTIVO
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: #a0aec0;">
+                            No hay almacenes registrados en el sistema.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-</body>
-</html>
+
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Proceso de Reciclaje - EcoData{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --dark-bg: #1a202c;
+        --orange-fire: #dd6b20;
+        --success: #38a169;
+        --bg-light: #f7fafc;
+    }
+    .card-panel { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 30px; overflow: hidden; }
+    .card-header-orange { background: var(--dark-bg); color: white; padding: 18px 25px; border-bottom: 4px solid var(--orange-fire); display: flex; align-items: center; gap: 12px; }
+    .form-input { width: 100%; padding: 12px; border: 2px solid #edf2f7; border-radius: 8px; background: #f8fafc; }
+    .form-input:focus { border-color: var(--orange-fire); outline: none; }
+    .btn-fire { background: var(--orange-fire); color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .btn-fire:hover { background: #c05621; }
+    .table-custom { width: 100%; border-collapse: collapse; }
+    .table-custom th { text-align: left; padding: 15px; border-bottom: 2px solid #edf2f7; color: #718096; text-transform: uppercase; font-size: 0.8rem; }
+    .table-custom td { padding: 15px; border-bottom: 1px solid #edf2f7; }
+    .badge-process { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; background: #feebc8; color: #c05621; }
+    .badge-done { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; background: #c6f6d5; color: #22543d; }
+</style>
+
+<div style="padding: 30px; background: var(--bg-light); min-height: 100vh;">
+    
+    <div class="card-panel">
+        <div class="card-header-orange">
+            <i class="fas fa-fire-alt fa-lg" style="color: var(--orange-fire);"></i>
+            <h3 style="margin:0; font-size: 1.2rem;">Iniciar Lote de Fundición / Reciclaje</h3>
+        </div>
+        <form action="/reciclaje" method="POST" style="padding: 25px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: end;">
+            <div>
+                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Código de Lote</label>
+                <input type="text" name="lote" class="form-input" placeholder="Ej: LOTE-AL-001" required>
+            </div>
+            <div>
+                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Tipo de Metal</label>
+                <select name="metal_origen" class="form-input" required>
+                    <option value="Aluminio">Aluminio</option>
+                    <option value="Cobre">Cobre</option>
+                    <option value="Bronce">Bronce</option>
+                    <option value="Acero">Acero / Fierro</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Peso Entrada (Chatarra KG)</label>
+                <input type="number" step="0.1" name="peso_entrada" class="form-input" placeholder="Ej: 500.5" required>
+            </div>
+            <div>
+                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Máquina / Horno</label>
+                <select name="id_maquina" class="form-input" required>
+                    {% for m in maquinas %}
+                    <option value="{{ m.id_maquina }}">{{ m.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-fire"><i class="fas fa-play"></i> Iniciar Proceso</button>
+        </form>
+    </div>
+
+    <div class="card-panel">
+        <div style="padding: 20px 25px; border-bottom: 1px solid #edf2f7;">
+            <h4 style="margin:0; color: #2d3748;"><i class="fas fa-cogs"></i> Monitoreo de Lotes Activos</h4>
+        </div>
+        <table class="table-custom">
+            <thead>
+                <tr>
+                    <th>Lote y Metal</th>
+                    <th>Máquina</th>
+                    <th>Entrada (KG)</th>
+                    <th>Rendimiento</th>
+                    <th>Estado / Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in procesos %}
+                <tr>
+                    <td>
+                        <strong style="color: var(--orange-fire);">{{ p.lote }}</strong><br>
+                        <small style="color: #718096;">{{ p.metal_origen }}</small>
+                    </td>
+                    <td><i class="fas fa-industry" style="color:#a0aec0;"></i> {{ p.maquina.nombre }}</td>
+                    <td><strong>{{ p.peso_entrada_kg }} kg</strong></td>
+                    
+                    <td>
+                        {% if p.estado == 'Completado' %}
+                            <div style="color: var(--success); font-weight: bold;">Salida: {{ p.peso_salida_kg }} kg</div>
+                            <div style="color: #e53e3e; font-size: 0.8rem;">Merma: {{ p.merma_kg }} kg 
+                                ({{ ((p.peso_salida_kg / p.peso_entrada_kg) * 100) | round(1) }}% Eficiencia)
+                            </div>
+                        {% else %}
+                            <span style="color: #a0aec0; font-size: 0.85rem;">Esperando fundición...</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        {% if p.estado != 'Completado' %}
+                        <form action="{{ url_for('finalizar_reciclaje', id_proceso=p.id_proceso) }}" method="POST" style="display: flex; gap: 10px;">
+                            <input type="number" step="0.1" name="peso_salida" class="form-input" style="padding: 6px; width: 100px;" placeholder="KG Salida" required>
+                            <button type="submit" class="btn-fire" style="padding: 6px 12px; background: var(--success);"><i class="fas fa-check"></i></button>
+                        </form>
+                        {% else %}
+                            <span class="badge-done"><i class="fas fa-check-double"></i> COMPLETADO</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,108 +1,69 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Ecodata - Inventario de Productos</title>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa;}
-        .sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; }
-        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0;}
-        .sidebar a { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; }
-        .sidebar a:hover, .sidebar a.active { background-color: #495057; }
-        .main { flex: 1; padding: 20px; overflow-y: auto; }
-        .topbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-radius: 8px;}
-        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; }
-        
-        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
-        input, select { padding: 10px; margin-right: 10px; margin-bottom:10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;}
-        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
-        .btn-add { background-color: #28a745; }
-        .btn-add:hover { background-color: #218838; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background-color: #343a40; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        
-        .stock-badge { background-color: #007bff; color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9em; font-weight: bold;}
-        .stock-zero { background-color: #dc3545; }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h2>ECODATA</h2>
-       <a href="/dashboard">Inicio</a>
-        <a href="/almacenes">Gestión de Almacenes</a> <a href="/bodegas">Bodegas (Materia Prima)</a>
-        <a href="/productos">↳ Catálogo Base</a>
-        <a href="/inventario_productos">↳ Inventario (Terminados)</a>
-        <a href="/procesos">Procesos de Fabricación</a>
-        <a href="/ventas">Ventas y Clientes</a>
-        <a href="/contabilidad">Administración Contable</a>
-        <a href="/usuarios">Gestión de Usuarios</a>
-    </div>
+{% extends "base.html" %}
 
-    <div class="main">
-        <div class="topbar">
-            <h3>Inventario de Productos Terminados</h3>
-            <div>
-                <span>Bienvenido, <strong>{{ usuario_actual }}</strong></span> | 
-                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
-            </div>
-        </div>
+{% block title %}Inventario Productos Terminados - Ecodata{% endblock %}
 
-        <div class="card">
-            <h4>Ingreso Manual a Bodega de Terminados</h4>
-            <form action="{{ url_for('inventario_productos') }}" method="POST">
-                <select name="id_producto" required style="width: 250px;">
-                    <option value="" disabled selected>-- Selecciona un Producto --</option>
-                    {% for p in productos %}
-                        <option value="{{ p.id_producto }}">{{ p.nombre_producto }}</option>
-                    {% endfor %}
-                </select>
-                
-                <select name="id_almacen" required style="width: 250px;">
-                    <option value="" disabled selected>-- Selecciona el Almacén --</option>
-                    {% for alm in almacenes %}
-                        <option value="{{ alm.id_almacen }}">{{ alm.nombre_almacen }}</option>
-                    {% endfor %}
-                </select>
-                <input type="number" name="cantidad" placeholder="Cantidad (Piezas)" required min="1" style="width: 150px;">
-                
-                <button type="submit" class="btn btn-add">Sumar al Inventario</button>
-            </form>
-        </div>
+{% block content %}
+<style>
+    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    input, select { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+    .btn-add { background-color: #007bff; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+    th { background-color: #343a40; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+</style>
 
-        <div class="card">
-            <h4>Existencias Actuales</h4>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">Almacén</th>
-                        <th>Nombre del Producto</th>
-                        <th>Fecha Fabricación</th>
-                        <th>Stock Disponible</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for inv in inventarios %}
-                    <tr>
-                        <td>Almacén #{{ inv.id_almacen }}</td>
-                        <td><strong>{{ inv.producto.nombre_producto }}</strong></td>
-                        <td>{{ inv.fecha_fabricacion }}</td>
-                        <td>
-                            <span class="stock-badge {% if inv.cantidad_stock == 0 %}stock-zero{% endif %}">
-                                {{ inv.cantidad_stock }} piezas
-                            </span>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" style="text-align: center;">El inventario está vacío. Ingresa stock arriba.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</body>
-</html>
+<div class="card">
+    <h4>Ingresar Stock de Producto Terminado</h4>
+    <form action="/inventario_productos" method="POST">
+        <select name="id_producto" required>
+            <option value="">-- Seleccionar Producto --</option>
+            {% for prod in productos %}
+                <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
+            {% endfor %}
+        </select>
+        
+        <select name="id_almacen" required>
+            <option value="">-- Seleccionar Almacén --</option>
+            {% for alm in almacenes %}
+                <option value="{{ alm.id_almacen }}">{{ alm.nombre_almacen }}</option>
+            {% endfor %}
+        </select>
+        
+        <input type="number" name="cantidad_stock" placeholder="Cantidad de Piezas" required>
+        
+        <input type="date" name="fecha_fabricacion" required title="Fecha de Fabricación">
+        
+        <button type="submit" class="btn btn-add">Actualizar Stock</button>
+    </form>
+</div>
+
+<div class="card">
+    <h4>Stock Actual</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Lote ID</th>
+                <th>Producto</th>
+                <th>Almacén</th>
+                <th>Piezas Disponibles</th>
+                <th>Fecha Fabricación</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inv in inventario %}
+            <tr>
+                <td>{{ inv.id_inventario_p }}</td>
+                <td><strong>{{ inv.producto.nombre_producto if inv.producto else 'ID: ' ~ inv.id_producto }}</strong></td>
+                <td>{{ inv.almacen.nombre_almacen if inv.almacen else 'ID: ' ~ inv.id_almacen }}</td>
+                <td style="color: #007bff; font-weight: bold;">{{ inv.cantidad_stock }} pzas</td>
+                <td>{{ inv.fecha_fabricacion }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align: center;">No hay productos terminados en stock.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Directorio de Clientes - Ecodata{% endblock %}
+
+{% block content %}
+<style>
+    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    input { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+    .btn-add { background-color: #17a2b8; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+    th { background-color: #343a40; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+</style>
+
+<div class="card">
+    <h4>Registrar Nuevo Cliente</h4>
+    <form action="/clientes" method="POST">
+        <input type="text" name="empresa" placeholder="Nombre de la Empresa (Ej. Ferretería El Tornillo)" required style="width: 300px;">
+        <input type="text" name="nombre_contacto" placeholder="Nombre del Contacto" required style="width: 250px;">
+        <input type="text" name="telefono" placeholder="Teléfono" style="width: 180px;">
+        <button type="submit" class="btn btn-add">Guardar Cliente</button>
+    </form>
+</div>
+
+<div class="card">
+    <h4>Cartera de Clientes</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Empresa</th>
+                <th>Contacto Principal</th>
+                <th>Teléfono</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr>
+                <td><strong>{{ cliente.empresa }}</strong></td>
+                <td>{{ cliente.nombre_contacto }}</td>
+                <td>{{ cliente.telefono if cliente.telefono else 'N/A' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" style="text-align: center; color: #6c757d;">No hay clientes registrados.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

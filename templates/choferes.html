@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="padding: 20px;">
+    <h2 style="margin-bottom: 25px; color: #2c3e50; font-weight: 700;">📂 Directorio de Choferes</h2>
+
+    <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 30px;">
+        <form method="POST" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; align-items: end;">
+            <div>
+                <label style="font-weight:600; display:block; margin-bottom:5px;">Nombre Completo</label>
+                <input type="text" name="nombre" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;" required>
+            </div>
+            <div>
+                <label style="font-weight:600; display:block; margin-bottom:5px;">Licencia</label>
+                <input type="text" name="licencia" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;" required>
+            </div>
+            <div>
+                <label style="font-weight:600; display:block; margin-bottom:5px;">Teléfono</label>
+                <input type="text" name="telefono" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;" required>
+            </div>
+            <button type="submit" style="background:#3498db; color:white; border:none; padding:12px; border-radius:6px; font-weight:700; cursor:pointer;">Registrar Chofer</button>
+        </form>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+        {% for c in choferes %}
+        <div style="background:white; border-radius:15px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.04); border:1px solid #eee;">
+            <div style="background: #f8f9fa; padding: 20px; text-align: center; border-bottom: 1px solid #eee;">
+                <div style="width:60px; height:60px; background:#3498db; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; font-size:1.5em; font-weight:700;">
+                    {{ c.nombre[0]|upper }}
+                </div>
+                <h4 style="margin:0; color:#2c3e50;">{{ c.nombre }}</h4>
+            </div>
+            <div style="padding: 15px;">
+                <p style="margin:5px 0; font-size:0.9em;"><strong>🆔 Licencia:</strong> {{ c.licencia }}</p>
+                <p style="margin:5px 0; font-size:0.9em;"><strong>📞 Tel:</strong> {{ c.telefono }}</p>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f4f4f4; text-align:center;">
+                    <span style="font-size:0.75em; color:#27ae60; font-weight:700;">● ACTIVO</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

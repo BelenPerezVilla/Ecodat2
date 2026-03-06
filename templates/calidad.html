@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Control de Calidad - Ecodata{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --success-color: #28a745;
+        --danger-color: #dc3545;
+        --dark-bg: #343a40;
+    }
+
+    .card {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+    }
+
+    .card h3 {
+        margin-top: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--dark-bg);
+    }
+
+    /* Estilos para el formulario */
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #555;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        font-size: 1rem;
+    }
+
+    .btn-save {
+        background-color: var(--success-color);
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.2s, background 0.3s;
+    }
+
+    .btn-save:hover {
+        background-color: #218838;
+        transform: translateY(-2px);
+    }
+
+    /* Estilos para la tabla */
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    th {
+        background-color: var(--dark-bg);
+        color: white;
+        padding: 15px;
+        text-align: left;
+    }
+
+    td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f2f2f2;
+    }
+
+    /* Badges de Estado */
+    .badge {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .badge-aprobado {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .badge-rechazado {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    tr:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+
+<div class="card">
+    <h3><i class="fas fa-microscope"></i> Registro de Inspección Técnica</h3>
+    <hr>
+    <form action="/calidad" method="POST">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="id_producto">Producto a Inspeccionar</label>
+                <select name="id_producto" id="id_producto" class="form-control" required>
+                    <option value="" disabled selected>Seleccione un producto del inventario...</option>
+                    {% for p in productos %}
+                    <option value="{{ p.id_producto }}">{{ p.nombre_producto }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="resultado">Veredicto Final</label>
+                <select name="resultado" id="resultado" class="form-control" required>
+                    <option value="Aprobado">✅ APROBADO (Cumple Estándar)</option>
+                    <option value="Rechazado">❌ RECHAZADO (Fuera de Norma)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="parametros">Parámetros Técnicos (Pureza, Medidas)</label>
+                <input type="text" name="parametros" id="parametros" class="form-control" 
+                       placeholder="Ej: Pureza 99.9%, Tolerancia +/- 0.5mm" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="observaciones">Observaciones Detalladas</label>
+            <textarea name="observaciones" id="observaciones" class="form-control" rows="3" 
+                      placeholder="Describa cualquier anomalía o detalle relevante encontrado durante la inspección..."></textarea>
+        </div>
+
+        <div style="text-align: right;">
+            <button type="submit" class="btn-save">
+                <i class="fas fa-save"></i> Registrar Inspección
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h3><i class="fas fa-clipboard-list"></i> Historial de Controles Recientes</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Producto</th>
+                    <th>Inspector</th>
+                    <th>Estado</th>
+                    <th>Parámetros Técnicos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in historial %}
+                <tr>
+                    <td><strong>#{{ c.id_inspeccion }}</strong></td>
+                    <td>{{ c.fecha_inspeccion.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ c.producto.nombre_producto }}</td>
+                    <td><i class="fas fa-user-check"></i> {{ c.inspector }}</td>
+                    <td>
+                        {% if c.resultado == 'Aprobado' %}
+                        <span class="badge badge-aprobado">Aprobado</span>
+                        {% else %}
+                        <span class="badge badge-rechazado">Rechazado</span>
+                        {% endif %}
+                    </td>
+                    <td><small style="color: #666;">{{ c.parametros_tecnicos }}</small></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 30px; color: #888;">
+                        No se han registrado inspecciones de calidad en el sistema.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

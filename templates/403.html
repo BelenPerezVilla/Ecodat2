@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Acceso Restringido - Ecodata{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 100px 20px;">
+    <div style="font-size: 80px; color: #dc3545; margin-bottom: 20px;">
+        <i class="fas fa-user-shield"></i>
+    </div>
+    <h1 style="color: #343a40;">Acceso Restringido</h1>
+    <p style="font-size: 1.2em; color: #6c757d; max-width: 600px; margin: 0 auto 30px;">
+        Lo sentimos, <strong>{{ session.get('usuario') }}</strong>. No tienes los privilegios de 
+        <strong>Administrador</strong> necesarios para visualizar este módulo.
+    </p>
+    <a href="/dashboard" class="btn" style="background-color: #343a40; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        <i class="fas fa-arrow-left"></i> Volver al Inicio
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Comercial - Ecodata{% endblock %}
+
+{% block content %}
+<style>
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .card-fin { background: white; padding: 25px; border-radius: 12px; border-left: 5px solid #28a745; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .card-fin h4 { margin: 0; color: #666; font-size: 0.9em; text-transform: uppercase; }
+    .card-fin .monto { font-size: 2em; font-weight: bold; margin-top: 10px; color: #2c3e50; }
+    .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .chart-box { background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; }
+</style>
+
+<div class="dashboard-header">
+    <h2>📊 Análisis Financiero y Comercial</h2>
+    <p>Resumen de ingresos y comportamiento de clientes.</p>
+</div>
+
+<div class="kpi-grid">
+    <div class="card-fin">
+        <h4>Ingresos Totales</h4>
+        <div class="monto">${{ "{:,.2f}".format(ingresos) }}</div>
+    </div>
+    <div class="card-fin" style="border-left-color: #17a2b8;">
+        <h4>Ticket Promedio</h4>
+        <div class="monto">${{ "{:,.2f}".format(ticket) }}</div>
+    </div>
+    <div class="card-fin" style="border-left-color: #6f42c1;">
+        <h4>Volumen de Ventas</h4>
+        <div class="monto">{{ num_ventas }} <span style="font-size: 0.5em; color: #999;">notas</span></div>
+    </div>
+</div>
+
+<div class="charts-row">
+    <div class="chart-box">
+        <h4>Ventas por Empresa ($)</h4>
+        <canvas id="chartClientes" height="120"></canvas>
+    </div>
+    <div class="chart-box">
+        <h4>Distribución de Cartera</h4>
+        <canvas id="chartDona"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Gráfica de Barras: Dinero por Cliente
+    new Chart(document.getElementById('chartClientes'), {
+        type: 'bar',
+        data: {
+            labels: {{ labels_cli|tojson }},
+            datasets: [{
+                label: 'Pesos Vendidos',
+                data: {{ values_dinero|tojson }},
+                backgroundColor: '#28a745'
+            }]
+        },
+        options: { indexAxis: 'y' } // Barras horizontales para que se lean mejor los nombres
+    });
+
+    // Gráfica de Dona: Participación
+    new Chart(document.getElementById('chartDona'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ labels_cli|tojson }},
+            datasets: [{
+                data: {{ values_dinero|tojson }},
+                backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#6f42c1', '#fd7e14']
+            }]
+        }
+    });
+</script>
+{% endblock %}

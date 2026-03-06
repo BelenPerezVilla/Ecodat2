@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Página no encontrada - Ecodata{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 100px 20px;">
+    <div style="font-size: 80px; color: #6c757d; margin-bottom: 20px;">
+        <i class="fas fa-excursion"></i> 404
+    </div>
+    <h1 style="color: #343a40;">¡Ups! Página no encontrada</h1>
+    <p style="font-size: 1.2em; color: #6c757d; max-width: 600px; margin: 0 auto 30px;">
+        Parece que la dirección que buscas no existe o fue movida.
+    </p>
+    <a href="/dashboard" class="btn" style="background-color: #17a2b8; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        Volver al Panel Principal
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Ecodata{% endblock %}</title>
+    <style>
+        /* Estilos Generales */
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa; overflow: hidden; }
+        
+        /* Barra Lateral (Sidebar) */
+        .sidebar { 
+            width: 260px; 
+            background-color: #343a40; 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            transition: margin-left 0.3s ease; /* Animación para ocultar */
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .sidebar.oculta { margin-left: -260px; } /* Clase que oculta la barra */
+        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0; letter-spacing: 2px;}
+        
+        /* Botones Principales y Submenús */
+        .menu-principal { padding: 15px; cursor: pointer; border-bottom: 1px solid #495057; display: flex; justify-content: space-between; font-weight: bold; user-select: none;}
+        .menu-principal:hover { background-color: #495057; }
+        .submenu { display: none; background-color: #2c3136; flex-direction: column; }
+        .submenu.abierto { display: flex; } /* Clase que muestra el submenú */
+        .submenu a { color: #adb5bd; padding: 12px 15px 12px 30px; text-decoration: none; border-bottom: 1px solid #3d444b; font-size: 0.9em;}
+        .submenu a:hover, .sidebar a.active { background-color: #495057; color: white; border-left: 4px solid #28a745; padding-left: 26px;}
+        
+        /* Enlace suelto (Inicio) */
+        .enlace-solo { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; font-weight: bold; display: block;}
+        .enlace-solo:hover { background-color: #495057; }
+
+        /* Contenido Principal */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Barra Superior (Topbar) */
+        .topbar { background: white; padding: 15px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; z-index: 10;}
+        .btn-toggle { background: #343a40; color: white; border: none; padding: 8px 12px; font-size: 1.2em; border-radius: 4px; cursor: pointer; transition: 0.2s;}
+        .btn-toggle:hover { background: #28a745; }
+        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; margin-left: 15px;}
+        
+        /* Área donde irá el contenido de cada pantalla */
+        .contenedor-pantalla { padding: 20px; overflow-y: auto; flex: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="miSidebar">
+        <h2>ECODATA</h2>
+        
+        <a href="/dashboard" class="enlace-solo">🏠 Inicio</a>
+
+        <div class="menu-principal" onclick="toggleSubmenu('sub-inventario')">
+            <span>📦 Inventario y Almacenes</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-inventario">
+            <a href="/productos">Catálogo de Productos</a>
+            <a href="/inventario_productos">Stock Terminados</a>
+            <a href="/inventario">
+                <i class="fas fa-chart-pie"></i> Dashboard de Metales
+            </a>
+            <a href="/almacenes">
+                <i class="fas fa-warehouse"></i> Zonas y Almacenes
+            </a>
+        </div>
+
+        <div class="menu-principal" onclick="toggleSubmenu('sub-produccion')">
+            <span>⚙️ Producción</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-produccion">
+            <a href="/procesos">Procesos de Fabricación</a>
+            <a href="/reciclaje">
+                <i class="fas fa-fire-alt"></i> Fundición y Reciclaje
+            </a>
+        </div>
+
+        <div class="menu-principal" onclick="toggleSubmenu('sub-mantenimiento')">
+            <span>🛠️ Mantenimiento y Equipos</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-mantenimiento">
+            <a href="/mantenimiento">Bitácora Técnica</a>
+        </div>
+        
+        <div class="menu-principal" onclick="toggleSubmenu('sub-logistica')">
+            <span>🚚 Logística y Entregas</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-logistica">
+            <a href="/transporte">
+                <i class="fas fa-shipping-fast"></i> Despacho de Pedidos
+            </a>
+            <a href="/vehiculos">
+                <i class="fas fa-truck"></i> Gestión de Flota
+            </a>
+            <a href="/choferes">
+                <i class="fas fa-id-card"></i> Directorio de Choferes
+            </a>
+        </div>
+
+        <div class="menu-principal" onclick="toggleSubmenu('sub-calidad')">
+            <span>🛡️ Control de Calidad</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-calidad">
+            <a href="/calidad">Registrar Inspección</a>
+            <a href="/reportes_calidad">Reportes de Rechazo</a>
+        </div>
+
+        {% if session.get('rol') == 'Administrador' %}
+        <div class="menu-principal" onclick="toggleSubmenu('sub-comercial')">
+            <span>🤝 Comercial y Finanzas</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-comercial">
+            <a href="/dash_comercial" style="background-color: #e8f5e9; color: #1b5e20; font-weight: bold;">📈 Dashboard Comercial</a>
+            <a href="/clientes">Directorio de Clientes</a>
+            <a href="/ventas">Ventas y Clientes</a>
+            <a href="/contabilidad">Administración Contable</a>
+        </div>
+
+        <div class="menu-principal" onclick="toggleSubmenu('sub-config')">
+            <span>⚙️ Configuración</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-config">
+            <a href="/almacenes">Gestión de Almacenes</a>
+            <a href="/proveedores">Directorio Proveedores</a>
+            <a href="/usuarios">Gestión de Usuarios</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="main-content">
+        <div class="topbar">
+            <div>
+                <button class="btn-toggle" onclick="toggleSidebar()">☰ Menú</button>
+            </div>
+            <div>
+                <span>Bienvenido, <strong>{{ session.get('usuario', 'Usuario') }}</strong></span>
+                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+            </div>
+        </div>
+
+        <div class="contenedor-pantalla">
+            {% block content %}
+            {% endblock %}
+        </div>
+    </div>
+
+    <script>
+        // Función para ocultar/mostrar toda la barra lateral
+        function toggleSidebar() {
+            const sidebar = document.getElementById('miSidebar');
+            sidebar.classList.toggle('oculta');
+        }
+
+        // Función para abrir/cerrar los submenús
+        function toggleSubmenu(idSubmenu) {
+            const submenu = document.getElementById(idSubmenu);
+            // Cerramos todos los demás submenús para que se vea limpio
+            const todosLosSubmenus = document.querySelectorAll('.submenu');
+            todosLosSubmenus.forEach(sub => {
+                if(sub.id !== idSubmenu) {
+                    sub.classList.remove('abierto');
+                }
+            });
+            // Alternamos el que el usuario hizo clic
+            submenu.classList.toggle('abierto');
+        }
+    </script>
+</body>
+</html>

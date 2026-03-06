@@ -137,3 +137,17 @@ class RolUsuario(db.Model):
     id_rol = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nombre_usuario = db.Column(db.String(50), nullable=False, unique=True)
     rol = db.Column(db.String(50), nullable=False) # 'Administrador' u 'Operador'
+
+# Al final de models.py
+class Calidad(db.Model):
+    __tablename__ = 'control_calidad'
+    id_inspeccion = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_producto = db.Column(db.Integer, db.ForeignKey('productos.id_producto'), nullable=False)
+    fecha_inspeccion = db.Column(db.Date, nullable=False)
+    inspector = db.Column(db.String(100), nullable=False)
+    resultado = db.Column(db.String(20), nullable=False) # 'Aprobado' o 'Rechazado'
+    observaciones = db.Column(db.Text)
+    parametros_tecnicos = db.Column(db.String(200))
+
+    # Esta relación es vital para que no dé error al consultar
+    producto = db.relationship('Producto', backref='controles_calidad')

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Directorio Proveedores{% endblock %}
+
+{% block content %}
+<style>
+    /* Solo los estilos específicos de esta pantalla */
+    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
+    input { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;}
+    .btn-add { background-color: #28a745; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+    th { background-color: #343a40; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+</style>
+
+<div class="card">
+    <h4>Registrar Nuevo Proveedor</h4>
+    <form action="{{ url_for('proveedores') }}" method="POST">
+        <input type="text" name="nombre" placeholder="Nombre de la Empresa o Persona" required style="width: 300px;">
+        <input type="text" name="telefono" placeholder="Teléfono de contacto (Opcional)" style="width: 220px;">
+        <button type="submit" class="btn btn-add">Guardar Proveedor</button>
+    </form>
+</div>
+
+<div class="card">
+    <h4>Proveedores Registrados</h4>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 10%;">ID</th>
+                <th>Nombre / Empresa</th>
+                <th>Teléfono</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prov in proveedores %}
+            <tr>
+                <td>{{ prov.id_proveedor }}</td>
+                <td><strong>{{ prov.nombre }}</strong></td>
+                <td>
+                    {% if prov.telefono %} {{ prov.telefono }} {% else %} <span style="color: gray;">Sin teléfono</span> {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" style="text-align: center;">Aún no hay proveedores registrados.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Logística y Despacho - EcoData{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --primary-dark: #1a202c;
+        --accent-blue: #3182ce;
+        --success-green: #38a169;
+        --warning-yellow: #ecc94b;
+        --bg-light: #f7fafc;
+        --text-main: #2d3748;
+    }
+
+    .main-container {
+        padding: 30px;
+        background-color: var(--bg-light);
+        min-height: 100vh;
+    }
+
+    /* Tarjetas Modernas */
+    .card-panel {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .card-header-dark {
+        background: var(--primary-dark);
+        color: white;
+        padding: 18px 25px;
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    /* Formulario Estilizado */
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        padding: 25px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: var(--text-main);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #edf2f7;
+        border-radius: 8px;
+        background: #f8fafc;
+        transition: all 0.3s ease;
+    }
+
+    .form-input:focus {
+        border-color: var(--accent-blue);
+        background: white;
+        outline: none;
+    }
+
+    .btn-submit-logistics {
+        background: var(--accent-blue);
+        color: white;
+        border: none;
+        padding: 15px 40px;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.3s;
+        margin: 0 25px 25px auto;
+        display: block;
+    }
+
+    .btn-submit-logistics:hover {
+        background: #2b6cb0;
+    }
+
+    /* Tabla de Tracking */
+    .table-responsive {
+        padding: 0 25px 25px 25px;
+        overflow-x: auto;
+    }
+
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .custom-table th {
+        text-align: left;
+        padding: 15px;
+        border-bottom: 2px solid #edf2f7;
+        color: #718096;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+
+    .custom-table td {
+        padding: 18px 15px;
+        border-bottom: 1px solid #edf2f7;
+        vertical-align: middle;
+    }
+
+    /* Indicadores de Estado */
+    .badge-status {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .bg-transit { background: #fefcbf; color: #975a16; }
+    .bg-delivered { background: #c6f6d5; color: #22543d; }
+
+    /* Botones de Acción */
+    .btn-action {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-print { background: #4a5568; color: white; }
+    .btn-print:hover { background: #2d3748; }
+    .btn-finish { background: var(--success-green); color: white; }
+</style>
+
+<div class="main-container">
+
+    <div class="card-panel">
+        <div class="card-header-dark">
+            <i class="fas fa-shipping-fast"></i>
+            <h3 style="margin:0; font-size: 1.2rem;">Panel de Despacho Industrial</h3>
+        </div>
+        <form action="/transporte" method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Orden de Venta / Cliente</label>
+                    <select name="id_venta" class="form-input" required>
+                        <option value="">Seleccione Venta...</option>
+                        {% for v in ventas %}
+                        <option value="{{ v.id_venta }}">Venta #{{ v.id_venta }} - {{ v.cliente. nombre_contacto }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Vehículo (Placa)</label>
+                    <select name="id_vehiculo" class="form-input" required>
+                        <option value="">Unidad disponible...</option>
+                        {% for veh in vehiculos %}
+                        <option value="{{ veh.id_vehiculo }}">{{ veh.placa }} ({{ veh.modelo }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Chofer Asignado</label>
+                    <select name="id_chofer" class="form-input" required>
+                        <option value="">Personal disponible...</option>
+                        {% for ch in choferes %}
+                        <option value="{{ ch.id_chofer }}">{{ ch.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Dirección de Destino</label>
+                    <input type="text" name="destino" class="form-input" placeholder="Destino final" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-submit-logistics">
+                <i class="fas fa-check-circle"></i> REGISTRAR Y DESPACHAR
+            </button>
+        </form>
+    </div>
+
+    <div class="card-panel">
+        <div style="padding: 20px 25px; border-bottom: 1px solid #edf2f7;">
+            <h4 style="margin:0; color: var(--primary-dark);">📦 Control de Rutas Activas</h4>
+        </div>
+        <div class="table-responsive">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Folio</th>
+                        <th>Transporte / Operador</th>
+                        <th>Ubicación Destino</th>
+                        <th>Estado</th>
+                        <th>Operaciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in envios %}
+                    <tr>
+                        <td>
+                            <span style="font-weight: 700; color: var(--accent-blue);">#ENV-{{ e.id_envio }}</span><br>
+                            <small style="color: #a0aec0;">Venta #{{ e.id_venta }}</small>
+                        </td>
+                        <td>
+                            <div style="font-weight: 600;">{{ e.vehiculo.placa }}</div>
+                            <div style="font-size: 0.8rem; color: #718096;">{{ e.chofer.nombre }}</div>
+                        </td>
+                        <td>
+                            <div style="font-size: 0.85rem;"><i class="fas fa-map-marker-alt" style="color:#e53e3e"></i> {{ e.destino }}</div>
+                        </td>
+                        <td>
+                            <span class="badge-status {{ 'bg-delivered' if e.estado_entrega == 'Entregado' else 'bg-transit' }}">
+                                {{ e.estado_entrega }}
+                            </span>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 8px;">
+                                <a href="{{ url_for('imprimir_vale', id_envio=e.id_envio) }}" class="btn-action btn-print">
+                                    <i class="fas fa-file-pdf"></i> Vale
+                                </a>
+
+                                {% if e.estado_entrega != 'Entregado' %}
+                                <form action="{{ url_for('finalizar_entrega', id_envio=e.id_envio) }}" method="POST" style="margin:0;">
+                                    <button type="submit" class="btn-action btn-finish">
+                                        <i class="fas fa-flag-checkered"></i> Finalizar
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span style="color: var(--success-green); font-size: 1.2rem; padding-left: 10px;">
+                                    <i class="fas fa-check-double"></i>
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 50px; color: #a0aec0;">
+                            <i class="fas fa-box-open fa-3x" style="display:block; margin-bottom:10px; opacity:0.3;"></i>
+                            No hay envíos en curso.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

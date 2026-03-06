@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Reporte de Calidad - Ecodata{% endblock %}
+
+{% block content %}
+<style>
+    .report-container {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 15px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-left: 5px solid #ccc;
+    }
+    .card-red { border-left-color: #dc3545; }
+    .card-green { border-left-color: #28a745; }
+    
+    .stat-number { font-size: 2.2em; font-weight: bold; display: block; }
+    .stat-label { color: #666; text-transform: uppercase; font-size: 0.8em; letter-spacing: 1px; }
+
+    .table-modern {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 10px;
+        margin-top: 20px;
+    }
+    .table-modern th {
+        background: transparent;
+        color: #444;
+        padding: 10px;
+        text-transform: uppercase;
+        font-size: 0.85em;
+    }
+    .table-modern tr {
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .table-modern td {
+        padding: 15px;
+        border-top: 1px solid #eee;
+        border-bottom: 1px solid #eee;
+    }
+    .table-modern td:first-child { border-left: 1px solid #eee; border-radius: 10px 0 0 10px; }
+    .table-modern td:last-child { border-right: 1px solid #eee; border-radius: 0 10px 10px 0; }
+
+    .btn-print {
+        background: #343a40;
+        color: white;
+        padding: 10px 25px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    @media print {
+        .btn-print, .sidebar, .navbar { display: none !important; }
+        .report-container { background: white; padding: 0; }
+    }
+</style>
+
+<div class="report-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <div>
+            <h2 style="margin: 0;">📊 Análisis de Calidad</h2>
+            <p style="color: #888;">Reporte detallado de cumplimiento y fallas de producción.</p>
+        </div>
+        <button onclick="window.print()" class="btn-print">
+            <i class="fas fa-print"></i> Exportar / Imprimir
+        </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+        <div class="stat-card card-green">
+            <div>
+                <span class="stat-label">Total Aprobados</span>
+                <span class="stat-number" style="color: #28a745;">
+                    {{ historial | selectattr('resultado', 'equalto', 'Aprobado') | list | length }}
+                </span>
+            </div>
+            <i class="fas fa-check-circle" style="font-size: 2.5em; color: #d4edda;"></i>
+        </div>
+
+        <div class="stat-card card-red">
+            <div>
+                <span class="stat-label">Total Rechazados</span>
+                <span class="stat-number" style="color: #dc3545;">
+                    {{ historial | selectattr('resultado', 'equalto', 'Rechazado') | list | length }}
+                </span>
+            </div>
+            <i class="fas fa-times-circle" style="font-size: 2.5em; color: #f8d7da;"></i>
+        </div>
+
+        <div class="stat-card" style="border-left-color: #17a2b8;">
+            <div>
+                <span class="stat-label">% de Eficacia</span>
+                <span class="stat-number" style="color: #17a2b8;">
+                    {% set total = historial | length %}
+                    {% if total > 0 %}
+                        {{ ((historial | selectattr('resultado', 'equalto', 'Aprobado') | list | length / total) * 100) | round(1) }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </span>
+            </div>
+            <i class="fas fa-chart-line" style="font-size: 2.5em; color: #d1ecf1;"></i>
+        </div>
+    </div>
+
+    <h4 style="margin-top: 40px; color: #444;">📋 Detalle de Productos Rechazados</h4>
+    <table class="table-modern">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Fecha de Inspección</th>
+                <th>Motivo del Rechazo</th>
+                <th>Inspector Responsable</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in historial if c.resultado == 'Rechazado' %}
+            <tr>
+                <td><strong>{{ c.producto.nombre_producto }}</strong></td>
+                <td>{{ c.fecha_inspeccion.strftime('%d/%m/%Y') }}</td>
+                <td style="color: #c53030; font-weight: 500;">
+                    <i class="fas fa-exclamation-triangle"></i> {{ c.observaciones }}
+                </td>
+                <td>{{ c.inspector }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #999;">No hay registros de rechazo en este periodo.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

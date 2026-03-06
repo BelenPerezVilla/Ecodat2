@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -124,3 +125,79 @@ class RolUsuario(db.Model):
     id_rol = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nombre_usuario = db.Column(db.String(50), nullable=False, unique=True)
     rol = db.Column(db.String(50), nullable=False) # 'Administrador' u 'Operador'
+
+class Maquina(db.Model):
+    __tablename__ = 'maquina'
+    id_maquina = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nombre = db.Column(db.String(100), nullable=False) # Ej. "Fundidora 1", "Prensa Hidráulica"
+    modelo = db.Column(db.String(100))
+    estado = db.Column(db.String(50), default='Operativa') # Operativa, En Reparación, Fuera de Servicio
+
+class Mantenimiento(db.Model):
+    __tablename__ = 'mantenimiento'
+    id_mantenimiento = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_maquina = db.Column(db.Integer, db.ForeignKey('maquina.id_maquina'), nullable=False)
+    tipo = db.Column(db.String(50), nullable=False) # Preventivo o Correctivo
+    descripcion = db.Column(db.Text, nullable=False)
+    fecha = db.Column(db.Date, nullable=False)
+    costo = db.Column(db.Float, default=0.0)
+    tecnico = db.Column(db.String(100))
+
+    maquina = db.relationship('Maquina', backref='historial_mantenimiento', lazy=True)
+class Calidad(db.Model):
+    __tablename__ = 'control_calidad'
+    id_inspeccion = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_producto = db.Column(db.Integer, db.ForeignKey('producto.id_producto'), nullable=False)
+    fecha_inspeccion = db.Column(db.Date, nullable=False)
+    inspector = db.Column(db.String(100), nullable=False)
+    resultado = db.Column(db.String(20), nullable=False) 
+    observaciones = db.Column(db.Text)
+    parametros_tecnicos = db.Column(db.String(200))
+
+    producto = db.relationship('Producto', backref='controles_calidad')
+
+class Vehiculo(db.Model):
+    __tablename__ = 'vehiculos'
+    id_vehiculo = db.Column(db.Integer, primary_key=True)
+    placa = db.Column(db.String(20), unique=True, nullable=False)
+    modelo = db.Column(db.String(50))
+    capacidad_kg = db.Column(db.Float) # Importante para metales
+    estado = db.Column(db.String(20), default='Disponible') # Disponible, En Ruta, Taller
+
+class Chofer(db.Model):
+    __tablename__ = 'choferes'
+    id_chofer = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    licencia = db.Column(db.String(50))
+    telefono = db.Column(db.String(20))
+
+class Envio(db.Model):
+    __tablename__ = 'envios'
+    id_envio = db.Column(db.Integer, primary_key=True)
+    id_venta = db.Column(db.Integer, db.ForeignKey('venta.id_venta')) # Vinculado a la venta
+    id_vehiculo = db.Column(db.Integer, db.ForeignKey('vehiculos.id_vehiculo'))
+    id_chofer = db.Column(db.Integer, db.ForeignKey('choferes.id_chofer'))
+    fecha_salida = db.Column(db.DateTime, default=datetime.now)
+    destino = db.Column(db.String(200))
+    estado_entrega = db.Column(db.String(20), default='En Tránsito') # En Tránsito, Entregado, Cancelado
+
+    # Relaciones para consultas fáciles
+    venta = db.relationship('Venta', backref='envio')
+    vehiculo = db.relationship('Vehiculo', backref='envios')
+    chofer = db.relationship('Chofer', backref='envios')
+
+class ProcesoReciclaje(db.Model):
+    __tablename__ = 'procesos_reciclaje'
+    id_proceso = db.Column(db.Integer, primary_key=True)
+    lote = db.Column(db.String(50), unique=True, nullable=False)
+    metal_origen = db.Column(db.String(50)) # Ej: Aluminio, Cobre Mixto
+    peso_entrada_kg = db.Column(db.Float, nullable=False) # Chatarra inicial
+    peso_salida_kg = db.Column(db.Float) # Metal limpio resultante
+    merma_kg = db.Column(db.Float) # Lo que se perdió/quemó
+    fecha_inicio = db.Column(db.DateTime, default=datetime.now)
+    fecha_fin = db.Column(db.DateTime)
+    estado = db.Column(db.String(20), default='En Proceso') # En Proceso, Completado
+    id_maquina = db.Column(db.Integer, db.ForeignKey('maquina.id_maquina')) # Asumiendo que tu tabla es 'maquina'
+
+    # Relación
+    maquina = db.relationship('Maquina', backref='procesos_reciclaje')
