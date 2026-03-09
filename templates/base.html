@@ -75,6 +75,9 @@
             <a href="/reciclaje">
                 <i class="fas fa-fire-alt"></i> Fundición y Reciclaje
             </a>
+            <a href="/maquinaria">
+                <i class="fas fa-cogs"></i> Control de Maquinaria
+            </a>
         </div>
 
         <div class="menu-principal" onclick="toggleSubmenu('sub-mantenimiento')">
@@ -97,6 +100,9 @@
             <a href="/choferes">
                 <i class="fas fa-id-card"></i> Directorio de Choferes
             </a>
+            <a href="/embarques">
+                <i class="fas fa-truck-moving"></i> Control de Báscula
+            </a>
         </div>
 
         <div class="menu-principal" onclick="toggleSubmenu('sub-calidad')">
@@ -105,6 +111,23 @@
         <div class="submenu" id="sub-calidad">
             <a href="/calidad">Registrar Inspección</a>
             <a href="/reportes_calidad">Reportes de Rechazo</a>
+        </div>
+
+        <div class="menu-principal" onclick="toggleSubmenu('sub-compras')">
+            <span>🛒 Compras y Abastecimiento</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-compras">
+            <a href="/compras">
+                <i class="fas fa-shopping-cart"></i> Registro de Compras
+            </a>
+            <a href="/proveedores">
+                <i class="fas fa-address-book"></i> Directorio Proveedores
+            </a>
+            <a href="/historial_compras" style="background-color: #e2e8f0; color: #2d3748; font-weight: bold;">
+                <i class="fas fa-list"></i> Historial de Compras
+            </a>
+
+
         </div>
 
         {% if session.get('rol') == 'Administrador' %}
@@ -126,6 +149,22 @@
             <a href="/proveedores">Directorio Proveedores</a>
             <a href="/usuarios">Gestión de Usuarios</a>
         </div>
+        <div class="menu-principal" onclick="toggleSubmenu('sub-personal')">
+            <span>👥 Personal y Accesos</span> <span>▾</span>
+        </div>
+        <div class="submenu" id="sub-personal">
+            <a href="/areas">
+                <i class="fas fa-building"></i> Departamentos / Áreas
+            </a>
+            
+            <a href="/personal">
+                <i class="fas fa-users"></i> Gestión de Personal
+            </a>
+            <a href="#">
+                <i class="fas fa-user-shield"></i> Privilegios (Próximamente)
+            </a>
+        </div>
+
         {% endif %}
     </div>
 

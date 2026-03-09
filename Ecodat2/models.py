@@ -151,3 +151,15 @@ class Calidad(db.Model):
 
     # Esta relación es vital para que no dé error al consultar
     producto = db.relationship('Producto', backref='controles_calidad')
+
+class Embarque(db.Model):
+    __tablename__ = 'embarque'
+    id_embarque = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    tipo_movimiento = db.Column(db.String(50), nullable=False) # 'Entrada (Compra)' o 'Salida (Venta)'
+    placas = db.Column(db.String(20), nullable=False)
+    chofer = db.Column(db.String(100))
+    origen_destino = db.Column(db.String(150)) # Nombre del Proveedor o Cliente
+    peso_bruto_kg = db.Column(db.Float, nullable=False) # Camión lleno
+    peso_tara_kg = db.Column(db.Float, nullable=False)  # Camión vacío
+    peso_neto_kg = db.Column(db.Float, nullable=False)  # Kilos reales de material
+    fecha_registro = db.Column(db.DateTime, default=datetime.now)

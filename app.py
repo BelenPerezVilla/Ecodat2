@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad, Vehiculo, Chofer, Envio, ProcesoReciclaje
+from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad, Vehiculo, Chofer, Envio, ProcesoReciclaje, Embarque, Maquinaria, Compra
 from urllib.parse import quote_plus
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.security import generate_password_hash
@@ -12,6 +12,7 @@ from sqlalchemy import func
 import csv
 import io
 from flask import make_response
+import json
 
 app = Flask(__name__)
 app.secret_key = 'hola123' # Necesario para las sesiones
@@ -71,7 +72,7 @@ with app.app_context():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        user = request.form['username']
+        user = request.form['usuario']
         passw = request.form['password']
         
         # 1. Buscamos al usuario en la tabla de credenciales
@@ -93,6 +94,88 @@ def login():
             return "Credenciales inválidas, intenta de nuevo."
             
     return render_template('login.html')
+
+@app.route('/areas', methods=['GET', 'POST'])
+def gestion_areas():
+    if request.method == 'POST':
+        # Recibimos el nombre del área desde el formulario
+        nombre = request.form.get('nombre_area')
+        
+        if nombre:
+            # Guardamos la nueva área en la base de datos
+            nueva_area = Area(nombre_area=nombre)
+            db.session.add(nueva_area)
+            
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                return f"Error al guardar el área: {e}"
+                
+        # Recargamos la página limpia
+        return redirect(url_for('gestion_areas'))
+    
+    # Si es GET, traemos todas las áreas para mostrarlas en la tabla
+    todas_las_areas = Area.query.all()
+    return render_template('areas.html', areas=todas_las_areas)
+
+
+@app.route('/personal', methods=['GET', 'POST'])
+def personal():
+    if request.method == 'POST':
+        # 1. Recibimos los datos del formulario
+        nuevo_usuario = request.form.get('usuario')
+        password = request.form.get('password')
+        id_area = request.form.get('id_area')
+        rol = request.form.get('rol')
+        
+        # 2. Guardamos el usuario y su contraseña en InicioLog
+        nuevo_log = InicioLog(
+            usuario=nuevo_usuario, 
+            contrasena=password, 
+            id_area=id_area
+        )
+        db.session.add(nuevo_log)
+        
+        # 3. Le asignamos su Nivel de Acceso en RolUsuario
+        nuevo_rol = RolUsuario(
+            nombre_usuario=nuevo_usuario,
+            rol=rol
+        )
+        db.session.add(nuevo_rol)
+        
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return f"Error al registrar personal: {e}"
+            
+        return redirect(url_for('personal'))
+    
+    # === Si es método GET (Solo cargar la página) ===
+    # Traemos las áreas para llenar el menú desplegable
+    areas = Area.query.all()
+    
+    # Armamos una lista combinando las tablas para que sea fácil leerla en HTML
+    usuarios_db = InicioLog.query.all()
+    lista_personal = []
+    
+    for u in usuarios_db:
+        # Buscamos el rol de este usuario específico
+        rol_obj = RolUsuario.query.filter_by(nombre_usuario=u.usuario).first()
+        rol_nombre = rol_obj.rol if rol_obj else 'Sin Rol'
+        
+        # Si tiene un área asignada, sacamos el nombre
+        nombre_area = u.area.nombre_area if u.area else 'Sin Área'
+        
+        lista_personal.append({
+            'id': u.id_usuario,
+            'usuario': u.usuario,
+            'area': nombre_area,
+            'rol': rol_nombre
+        })
+        
+    return render_template('personal.html', areas=areas, personal=lista_personal)
 
 @app.route('/logout')
 def logout():
@@ -447,6 +530,48 @@ def finalizar_proceso(id_proceso):
         db.session.commit()
         
     return redirect(url_for('procesos'))
+@app.route('/maquinaria', methods=['GET', 'POST'])
+def maquinaria():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        nueva_maquina = Maquina(
+            nombre=request.form['nombre'],
+            modelo=request.form['modelo'], # <-- Aquí cambiamos 'tipo' por 'modelo'
+            estado=request.form.get('estado', 'Operativa')
+        )
+        db.session.add(nueva_maquina)
+        
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return f"Error al guardar la máquina: {e}"
+            
+        return redirect(url_for('maquinaria'))
+
+    lista_maquinas = Maquina.query.all()
+    return render_template('maquinaria.html', maquinas=lista_maquinas)
+
+@app.route('/actualizar_maquina/<int:id_maquina>', methods=['POST'])
+def actualizar_maquina(id_maquina):
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    maquina = Maquina.query.get_or_404(id_maquina)
+    nuevo_estado = request.form['estado']
+    maquina.estado = nuevo_estado
+    
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return f"Error al actualizar estado: {e}"
+        
+    return redirect(url_for('maquinaria'))
+
+
 # --- MÓDULO DE ADMINISTRACIÓN CONTABLE ---
 @app.route('/contabilidad', methods=['GET', 'POST'])
 def contabilidad():
@@ -490,6 +615,76 @@ def contabilidad():
                            total_egresos=total_egresos,
                            balance=balance,
                            usuario_actual=session['usuario'])
+
+@app.route('/procesar_carrito', methods=['POST'])
+def procesar_carrito():
+    datos_carrito_json = request.form.get('datos_carrito')
+    id_proveedor = request.form.get('id_proveedor')
+    folio_factura = request.form.get('folio_factura')
+    
+    if not id_proveedor:
+        return "Error: Debes seleccionar un proveedor para realizar la compra.", 400
+
+    carrito = json.loads(datos_carrito_json)
+    
+    # Buscamos el primer almacén disponible para meter la chatarra ahí.
+    # (Si aún no tienes almacenes en la BD, asignamos el ID 1 por defecto).
+    almacen = Almacen.query.first()
+    id_almacen_destino = almacen.id_almacen if almacen else 1
+    
+    for item in carrito:
+        cantidad_comprada = float(item['cantidad'])
+        precio = float(item['precio'])
+        nombre_producto = item['nombre']
+        
+        subtotal = cantidad_comprada * precio
+        iva = subtotal * 0.16
+        total = subtotal + iva
+        
+        # 1. Guardamos el ticket en la tabla COMPRA
+        nueva_compra = Compra(
+            id_proveedor=id_proveedor,
+            producto=nombre_producto,
+            cantidad=cantidad_comprada,
+            precio_unitario=precio,
+            subtotal=subtotal,
+            iva=iva,
+            total=total,
+            folio_factura=folio_factura if folio_factura else 'Sin Factura',
+            estado='Pagada'
+        )
+        db.session.add(nueva_compra)
+
+        # ==========================================
+        # 2. LÓGICA DE INVENTARIO (Usando tus modelos)
+        # ==========================================
+        # Registramos la entrada de este lote específico de metal
+        nuevo_lote_metal = InventarioMetal(
+            id_almacen=id_almacen_destino,
+            id_proveedor=id_proveedor,
+            tipo_metal=nombre_producto,
+            cantidad_kg=cantidad_comprada,
+            fecha_entrada=datetime.now().date()
+        )
+        db.session.add(nuevo_lote_metal)
+        # ==========================================
+        
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return f"Error al guardar la compra o actualizar inventario: {e}"
+        
+    return redirect(url_for('compras'))
+
+@app.route('/historial_compras')
+def historial_compras():
+    # Buscamos todas las compras en la base de datos
+    # Las ordenamos de la más reciente a la más antigua (descendente)
+    todas_las_compras = Compra.query.order_by(Compra.id_compra.desc()).all()
+    
+    return render_template('historial_compras.html', compras=todas_las_compras)
+
 @app.route('/ventas', methods=['GET', 'POST'])
 def ventas():
     if 'usuario' not in session:
@@ -555,6 +750,49 @@ def dash_comercial():
                            num_ventas=num_ventas,
                            labels_cli=labels_clientes,
                            values_dinero=values_dinero)
+
+@app.route('/compras', methods=['GET', 'POST'])
+def compras():
+    if request.method == 'POST':
+        id_proveedor = request.form.get('id_proveedor')
+        producto = request.form.get('producto')
+        cantidad = float(request.form.get('cantidad'))
+        precio_unitario = float(request.form.get('precio_unitario'))
+        folio_factura = request.form.get('folio_factura')
+        estado = request.form.get('estado')
+
+        # Matemáticas financieras automáticas
+        subtotal = cantidad * precio_unitario
+        iva = subtotal * 0.16  # Cambia a 0.08 si estás en zona fronteriza
+        total = subtotal + iva
+
+        nueva_compra = Compra(
+            id_proveedor=id_proveedor,
+            producto=producto,
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+            subtotal=subtotal,
+            iva=iva,
+            total=total,
+            folio_factura=folio_factura if folio_factura else 'Sin Factura',
+            estado=estado
+        )
+        
+        db.session.add(nueva_compra)
+        
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return f"Error al registrar la compra: {e}"
+            
+        return redirect(url_for('compras'))
+
+    # Para el método GET: Traemos las compras y los proveedores para el menú
+    lista_compras = Compra.query.order_by(Compra.fecha_compra.desc()).all()
+    lista_proveedores = Proveedor.query.all()
+    
+    return render_template('compras.html', compras=lista_compras, proveedores=lista_proveedores)
 
 # --- MÓDULO DIRECTORIO DE CLIENTES ---
 @app.route('/clientes', methods=['GET', 'POST'])
@@ -762,6 +1000,86 @@ def vehiculos():
         return redirect(url_for('vehiculos'))
     lista = Vehiculo.query.all()
     return render_template('vehiculos.html', vehiculos=lista)
+
+@app.route('/embarques', methods=['GET', 'POST'])
+def embarques():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        peso_bruto = float(request.form['peso_bruto'])
+        peso_tara = float(request.form['peso_tara'])
+        peso_neto = peso_bruto - peso_tara
+        
+        tipo_mov = request.form['tipo_movimiento']
+        tipo_metal_ingresado = request.form['tipo_metal']
+
+        nuevo_embarque = Embarque(
+            tipo_movimiento=tipo_mov,
+            placas=request.form['placas'], # Viene del menú desplegable
+            chofer=request.form['chofer'],
+            origen_destino=request.form['origen_destino'],
+            tipo_metal=tipo_metal_ingresado,
+            peso_bruto_kg=peso_bruto,
+            peso_tara_kg=peso_tara,
+            peso_neto_kg=peso_neto,
+            fecha_registro=datetime.now()
+        )
+        db.session.add(nuevo_embarque)
+
+        # --- MAGIA DEL ERP: AUTOMATIZACIÓN DE INVENTARIO ---
+        if tipo_mov == 'Entrada':
+            # Buscamos si ya existe el metal en el inventario
+            inventario = InventarioMetal.query.filter_by(tipo_metal=tipo_metal_ingresado).first()
+            
+            if inventario:
+                # Si existe, sumamos los kilos
+                inventario.cantidad_kg += peso_neto
+            else:
+                # Si es nuevo, creamos el registro (usando Almacen 1 y Proveedor 1 por defecto)
+                nuevo_inventario = InventarioMetal(
+                    id_almacen=1,       
+                    id_proveedor=1,     
+                    tipo_metal=tipo_metal_ingresado,
+                    cantidad_kg=peso_neto,
+                    fecha_entrada=date.today()
+                )
+                db.session.add(nuevo_inventario)
+        # ----------------------------------------------------
+        
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return f"Error al registrar el embarque o actualizar inventario: {e}"
+            
+        return redirect(url_for('embarques'))
+
+    # Para cargar la página (GET)
+    # 1. Traemos el historial de embarques
+    lista_embarques = Embarque.query.order_by(Embarque.fecha_registro.desc()).all()
+    
+    # 2. Traemos los catálogos para los menús desplegables
+    vehiculos = Vehiculo.query.all()
+    proveedores = Proveedor.query.all()
+    clientes = Cliente.query.all()
+    lista_choferes = Chofer.query.all()
+    
+    # 3. TRUCO: Sacamos una lista de los metales que ya existen en tu inventario para no duplicarlos
+    metales_unicos = db.session.query(InventarioMetal.tipo_metal).distinct().all()
+    lista_metales = [m[0] for m in metales_unicos] # Lo convierte en una lista fácil de leer
+    
+    # Asegúrate de enviar todas estas variables al HTML
+    return render_template('embarques.html', 
+                           embarques=lista_embarques, 
+                           vehiculos=vehiculos,
+                           proveedores=proveedores,
+                           clientes=clientes,
+                           choferes=lista_choferes,
+                           metales=lista_metales)
+
+
+
 
 @app.route('/choferes', methods=['GET', 'POST'])
 def choferes():
@@ -1064,6 +1382,16 @@ def editar_usuario(id):
                            areas=lista_areas, 
                            usuario_actual=session['usuario'])
 
+
+@app.route('/actualizar_bd')
+def actualizar_bd():
+    try:
+        # Ejecutamos el comando SQL directo para agregar la columna
+        db.session.execute(db.text("ALTER TABLE embarque ADD COLUMN tipo_metal VARCHAR(100) NOT NULL DEFAULT 'Sin Especificar';"))
+        db.session.commit()
+        return "¡Base de datos actualizada con éxito! Ya puedes usar el módulo de embarques."
+    except Exception as e:
+        return f"Ocurrió un error (quizás la columna ya existe): {e}"
 
 
 if __name__ == '__main__':

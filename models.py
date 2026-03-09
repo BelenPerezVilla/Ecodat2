@@ -201,3 +201,49 @@ class ProcesoReciclaje(db.Model):
 
     # Relación
     maquina = db.relationship('Maquina', backref='procesos_reciclaje')
+
+class Embarque(db.Model):
+    __tablename__ = 'embarque'
+    id_embarque = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    tipo_movimiento = db.Column(db.String(50), nullable=False) # 'Entrada (Compra)' o 'Salida (Venta)'
+    placas = db.Column(db.String(20), nullable=False)
+    chofer = db.Column(db.String(100))
+    origen_destino = db.Column(db.String(150)) # Nombre del Proveedor o Cliente
+    tipo_metal = db.Column(db.String(100), nullable=False)
+    peso_bruto_kg = db.Column(db.Float, nullable=False) # Camión lleno
+    peso_tara_kg = db.Column(db.Float, nullable=False)  # Camión vacío
+    peso_neto_kg = db.Column(db.Float, nullable=False)  # Kilos reales de material
+    fecha_registro = db.Column(db.DateTime, default=datetime.now)
+
+class Maquinaria(db.Model):
+    __tablename__ = 'maquinaria'
+    id_maquina = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nombre_equipo = db.Column(db.String(100), nullable=False) # Ej: Prensa Hidráulica 1, Montacargas B
+    tipo = db.Column(db.String(50), nullable=False) # Ej: Prensa, Montacargas, Trituradora
+    marca = db.Column(db.String(50))
+    modelo = db.Column(db.String(50))
+    numero_serie = db.Column(db.String(50))
+    estado = db.Column(db.String(30), default='Activa', nullable=False) # Activa, En Mantenimiento, Inactiva
+    proximo_mantenimiento = db.Column(db.Date) # Para saber cuándo le toca servicio
+
+class Compra(db.Model):
+    __tablename__ = 'compra'
+    id_compra = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_proveedor = db.Column(db.Integer, db.ForeignKey('proveedor.id_proveedor'), nullable=False)
+    
+    # Detalles del producto/material comprado
+    producto = db.Column(db.String(150), nullable=False)
+    cantidad = db.Column(db.Float, nullable=False)
+    precio_unitario = db.Column(db.Float, nullable=False)
+    
+    # Totales y Facturación
+    subtotal = db.Column(db.Float, nullable=False)
+    iva = db.Column(db.Float, nullable=False)
+    total = db.Column(db.Float, nullable=False)
+    folio_factura = db.Column(db.String(100)) # ¡Aquí guardamos la factura!
+    
+    fecha_compra = db.Column(db.DateTime, default=db.func.current_timestamp())
+    estado = db.Column(db.String(50), default='Pagada') # Pendiente, Pagada, Cancelada
+
+    # Relación para jalar el nombre del proveedor automáticamente
+    proveedor = db.relationship('Proveedor', backref='compras_realizadas')

@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Control de Báscula y Embarques - EcoData{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --primary-dark: #1a202c;
+        --accent-blue: #3182ce;
+        --success-green: #38a169;
+        --bg-light: #f7fafc;
+    }
+    .card-panel { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; overflow: hidden; }
+    .card-header-dark { background: var(--primary-dark); color: white; padding: 18px 25px; display: flex; align-items: center; gap: 12px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 25px; }
+    .form-group label { display: block; font-weight: 700; margin-bottom: 8px; color: #4a5568; font-size: 0.85rem; text-transform: uppercase; }
+    .form-input { width: 100%; padding: 10px; border: 2px solid #edf2f7; border-radius: 8px; background-color: #fff; }
+    .btn-submit { background: var(--accent-blue); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 0 25px 25px auto; display: block; }
+    .table-custom { width: 100%; border-collapse: collapse; }
+    .table-custom th { text-align: left; padding: 15px; border-bottom: 2px solid #edf2f7; color: #718096; font-size: 0.8rem; text-transform: uppercase; }
+    .table-custom td { padding: 15px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
+    
+    .badge-entrada { background: #c6f6d5; color: #22543d; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .badge-salida { background: #ebf8ff; color: #2b6cb0; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .peso-neto { font-weight: bold; color: var(--success-green); font-size: 1.1rem; }
+    .material-badge { background: #edf2f7; color: #4a5568; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; border: 1px solid #e2e8f0; }
+    
+    /* Pequeño ajuste visual para los select */
+    select.form-input { appearance: auto; cursor: pointer; }
+</style>
+
+<div style="padding: 30px; background: var(--bg-light); min-height: 100vh;">
+    
+    <div class="card-panel">
+        <div class="card-header-dark">
+            <i class="fas fa-truck-moving"></i>
+            <h3 style="margin:0; font-size: 1.2rem;">Registro de Báscula (Inbound / Outbound)</h3>
+        </div>
+        <form action="/embarques" method="POST">
+            <div class="form-grid">
+                
+                <div class="form-group">
+                    <label>Tipo de Movimiento</label>
+                    <select name="tipo_movimiento" class="form-input" required>
+                        <option value="Entrada">⬇️ Entrada (Recepción de Chatarra)</option>
+                        <option value="Salida">⬆️ Salida (Venta a Cliente)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Vehículo Registrado</label>
+                    <select name="placas" class="form-input" required>
+                        <option value="" disabled selected>Seleccione un vehículo...</option>
+                        {% for v in vehiculos %}
+                            <option value="{{ v.placas }}">{{ v.placas }} - {{ v.marca }} {{ v.modelo }}</option>
+                        {% else %}
+                            <option value="" disabled>No hay vehículos registrados</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Chofer</label>
+                    <select name="chofer" class="form-input" required>
+                        <option value="" disabled selected>Seleccione un chofer...</option>
+                        {% for c in choferes %}
+                            <option value="{{ c.nombre }}">{{ c.nombre }} (Lic: {{ c.licencia }})</option>
+                        {% else %}
+                             <option value="" disabled>No hay choferes registrados</option>
+                        {% endfor %}
+                     </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Origen / Destino</label>
+                    <select name="origen_destino" class="form-input" required>
+                        <option value="" disabled selected>Selecciona Origen / Destino...</option>
+                        
+                        <optgroup label="🏭 Proveedores (Para Entradas)">
+                            {% for p in proveedores %}
+                                <option value="{{ p.nombre }}">{{ p.nombre }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        
+                        <optgroup label="🏢 Clientes (Para Salidas)">
+                            {% for c in clientes %}
+                                <option value="{{ c.empresa }}">{{ c.empresa }} ({{ c.nombre_contacto }})</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Tipo de Material / Metal</label>
+                    <input list="lista-metales" name="tipo_metal" class="form-input" placeholder="Selecciona o escribe uno nuevo..." autocomplete="off" required>
+                    <datalist id="lista-metales">
+                        {% for metal in metales %}
+                            <option value="{{ metal }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="form-group">
+                    <label>Peso Bruto (Camión Lleno) - KG</label>
+                    <input type="number" step="0.1" name="peso_bruto" class="form-input" placeholder="0.00" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Peso Tara (Camión Vacío) - KG</label>
+                    <input type="number" step="0.1" name="peso_tara" class="form-input" placeholder="0.00" required>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn-submit"><i class="fas fa-weight"></i> Registrar Pesaje</button>
+        </form>
+    </div>
+
+    <div class="card-panel">
+        <div style="padding: 20px 25px; border-bottom: 1px solid #edf2f7;">
+            <h4 style="margin:0; color: var(--primary-dark);"><i class="fas fa-clipboard-list"></i> Historial de Movimientos</h4>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="table-custom">
+                <thead>
+                    <tr>
+                        <th>Folio</th>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Vehículo / Chofer</th>
+                        <th>Origen / Destino</th>
+                        <th>Material</th>
+                        <th>Bruto / Tara</th>
+                        <th>Peso Neto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in embarques %}
+                    <tr>
+                        <td><strong>#EMB-{{ e.id_embarque }}</strong></td>
+                        <td>{{ e.fecha_registro.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>
+                            <span class="{% if e.tipo_movimiento == 'Entrada' %}badge-entrada{% else %}badge-salida{% endif %}">
+                                <i class="fas {% if e.tipo_movimiento == 'Entrada' %}fa-arrow-down{% else %}fa-arrow-up{% endif %}"></i> 
+                                {{ e.tipo_movimiento | upper }}
+                            </span>
+                        </td>
+                        <td>
+                            <div style="font-weight: bold;">{{ e.placas }}</div>
+                            <div style="font-size: 0.8rem; color: #718096;"><i class="fas fa-user"></i> {{ e.chofer }}</div>
+                        </td>
+                        <td>{{ e.origen_destino }}</td>
+                        
+                        <td><span class="material-badge">{{ e.tipo_metal }}</span></td>
+                        
+                        <td style="font-size: 0.85rem; color: #718096;">
+                            B: {{ e.peso_bruto_kg }} kg<br>
+                            T: {{ e.peso_tara_kg }} kg
+                        </td>
+                        <td class="peso-neto">{{ e.peso_neto_kg }} kg</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px; color: #a0aec0;">
+                            <i class="fas fa-truck" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                            No hay embarques registrados en la báscula.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Historial de Compras{% endblock %}
+
+{% block content %}
+<style>
+    .header-historial { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .header-historial h2 { color: #2d3748; margin: 0; }
+    
+    .tabla-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow-x: auto;}
+    .tabla-historial { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    .tabla-historial th { background-color: #edf2f7; color: #4a5568; padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e0; }
+    .tabla-historial td { padding: 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; }
+    .tabla-historial tr:hover { background-color: #f7fafc; }
+    
+    .badge-pagada { background-color: #c6f6d5; color: #22543d; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+</style>
+
+<div class="header-historial">
+    <h2><i class="fas fa-list"></i> Historial de Compras a Proveedores</h2>
+    <a href="/compras" style="background: #3182ce; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;">+ Nueva Compra</a>
+</div>
+
+<div class="tabla-container">
+    <table class="tabla-historial">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Proveedor (ID)</th>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unit.</th>
+                <th>Total</th>
+                <th>Folio Factura</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for compra in compras %}
+            <tr>
+                <td>#{{ compra.id_compra }}</td>
+                <td>{{ compra.id_proveedor }}</td>
+                <td><strong>{{ compra.producto }}</strong></td>
+                <td>{{ compra.cantidad }}</td>
+                <td>${{ "{:,.2f}".format(compra.precio_unitario) }}</td>
+                <td><strong>${{ "{:,.2f}".format(compra.total) }}</strong></td>
+                <td>{{ compra.folio_factura }}</td>
+                <td><span class="badge-pagada">{{ compra.estado }}</span></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" style="text-align: center; color: #718096; padding: 20px;">No hay compras registradas aún.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
