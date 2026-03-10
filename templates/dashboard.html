@@ -4,61 +4,165 @@
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 <style>
-    /* Estilos específicos del Dashboard */
-    .kpi-container { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
-    .kpi-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; flex: 1; min-width: 200px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .kpi-card h3 { margin: 0; color: #6c757d; font-size: 0.9em; text-transform: uppercase; }
-    .kpi-card .value { font-size: 2.5em; font-weight: bold; margin: 10px 0; }
-    .kpi-card .icon { font-size: 2em; margin-bottom: 5px; }
-    
-    .color-metal { color: #007bff; }
-    .color-prod { color: #28a745; }
-    .color-proc { color: #ffc107; }
-    .color-venta { color: #17a2b8; }
+    /* Contenedor Principal */
+    .dashboard-wrapper { padding: 25px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fc; }
 
-    .charts-container { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
-    .chart-box { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; flex: 1; min-width: 300px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .chart-box h4 { margin-top: 0; color: #333; text-align: center; }
+    /* Cabecera */
+    .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .btn-excel { 
+        background: #1cc88a; color: white; padding: 12px 24px; border-radius: 10px; 
+        text-decoration: none; font-weight: bold; display: flex; align-items: center; 
+        gap: 10px; transition: 0.3s; box-shadow: 0 4px 12px rgba(28, 200, 138, 0.2); 
+    }
+    .btn-excel:hover { background: #17a673; transform: translateY(-2px); }
+
+    /* Cuadrícula de KPIs */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .kpi-card { 
+        background: white; padding: 20px; border-radius: 12px; border: 1px solid #eef0f3; 
+        text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.03); border-top: 4px solid #d1d3e2;
+    }
+    .kpi-card h3 { margin: 0; color: #858796; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+    .kpi-card .value { font-size: 1.8rem; font-weight: bold; margin: 10px 0; display: block; }
+    
+    /* Colores Temáticos */
+    .border-blue { border-top-color: #4e73df; }
+    .border-green { border-top-color: #1cc88a; }
+    .border-yellow { border-top-color: #f6c23e; }
+    .border-red { border-top-color: #e74a3b; }
+    .border-cyan { border-top-color: #36b9cc; }
+
+    .color-blue { color: #4e73df; }
+    .color-green { color: #1cc88a; }
+    .color-yellow { color: #f6c23e; }
+    .color-red { color: #e74a3b; }
+    .color-cyan { color: #36b9cc; }
+
+    /* Gráficas */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .chart-box { background: white; padding: 25px; border-radius: 12px; border: 1px solid #eef0f3; box-shadow: 0 4px 6px rgba(0,0,0,0.03); }
+    .chart-full { grid-column: span 2; }
+    .chart-box h4 { margin-top: 0; color: #5a5c69; font-size: 0.9rem; text-align: center; border-bottom: 1px solid #f8f9fa; padding-bottom: 15px; margin-bottom: 20px; }
 </style>
 
-<div class="kpi-container">
-    <div class="kpi-card"><div class="icon">🏗️</div><h3>Metal en Bodegas</h3><div class="value color-metal">{{ total_kilos }} <span style="font-size:0.4em;">kg</span></div></div>
-    <div class="kpi-card"><div class="icon">📦</div><h3>Stock Terminado</h3><div class="value color-prod">{{ total_piezas }} <span style="font-size:0.4em;">pzas</span></div></div>
-    <div class="kpi-card"><div class="icon">⚙️</div><h3>Procesos Activos</h3><div class="value color-proc">{{ procesos_activos }}</div></div>
-    <div class="kpi-card"><div class="icon">🤝</div><h3>Ventas Cerradas</h3><div class="value color-venta">{{ total_ventas }}</div></div>
-</div>
+<div class="dashboard-wrapper">
+    
+    <div class="header-flex">
+        <div>
+            <h2 style="color: #333; margin: 0;">Panel de Control EcoData</h2>
+            <p style="color: #858796; margin: 5px 0 0 0;">Bienvenido de nuevo, <strong>{{ usuario_actual }}</strong></p>
+        </div>
+        <a href="{{ url_for('exportar_ventas') }}" class="btn-excel">
+            <i class="fas fa-file-excel"></i> Exportar Reporte de Ventas
+        </a>
+    </div>
 
-<div class="charts-container">
-    <div class="chart-box">
-        <h4>Stock de Productos Terminados (Piezas)</h4>
-        <canvas id="graficaProductos"></canvas>
+    <div class="kpi-grid">
+        <div class="kpi-card border-blue">
+            <h3>Materia Prima</h3>
+            <span class="value color-blue">{{ total_kilos }} <small style="font-size: 1rem;">kg</small></span>
+        </div>
+        <div class="kpi-card border-green">
+            <h3>Stock Terminado</h3>
+            <span class="value color-green">{{ total_piezas }} <small style="font-size: 1rem;">pzas</small></span>
+        </div>
+        <div class="kpi-card border-yellow">
+            <h3>Procesos Activos</h3>
+            <span class="value color-yellow">{{ procesos_activos }}</span>
+        </div>
     </div>
-    <div class="chart-box">
-        <h4>Distribución de Metales (Kg)</h4>
-        <canvas id="graficaMetales"></canvas>
+
+    <div class="kpi-grid">
+        <div class="kpi-card border-red">
+            <h3>Ventas Totales ($)</h3>
+            <span class="value color-red">${{ "{:,.2f}".format(dinero_total) }}</span>
+        </div>
+        <div class="kpi-card border-cyan">
+            <h3>Pedidos Pendientes</h3>
+            <span class="value color-cyan">{{ pedidos_pendientes }}</span>
+        </div>
     </div>
+
+    <div class="charts-grid">
+        <div class="chart-box chart-full">
+            <h4><i class="fas fa-chart-line"></i> Tendencia de Ingresos (Últimos 7 días)</h4>
+            <canvas id="graficaVentas" style="max-height: 280px;"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <h4><i class="fas fa-barcode"></i> Disponibilidad de Productos</h4>
+            <canvas id="graficaProductos"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <h4><i class="fas fa-pie-chart"></i> Distribución de Metales (kg)</h4>
+            <canvas id="graficaMetales"></canvas>
+        </div>
+    </div>
+
 </div>
 
 <script>
-    const nombresProd = {{ nombres_prod | tojson }};
-    const cantidadesProd = {{ cantidades_prod | tojson }};
-    const tiposMetal = {{ tipos_metal | tojson }};
-    const kilosMetal = {{ kilos_metal | tojson }};
-
-    const ctxProd = document.getElementById('graficaProductos').getContext('2d');
-    new Chart(ctxProd, {
-        type: 'bar',
-        data: { labels: nombresProd, datasets: [{ label: 'Piezas', data: cantidadesProd, backgroundColor: 'rgba(40, 167, 69, 0.6)', borderColor: 'rgba(40, 167, 69, 1)', borderWidth: 1 }] },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    // 1. Gráfica de Ventas (Línea)
+    new Chart(document.getElementById('graficaVentas'), {
+        type: 'line',
+        data: {
+            labels: {{ labels_ventas | tojson }},
+            datasets: [{
+                label: 'Ingresos Diarios',
+                data: {{ valores_ventas | tojson }},
+                borderColor: '#e74a3b',
+                backgroundColor: 'rgba(231, 74, 59, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, grid: { color: '#f8f9fa' } } }
+        }
     });
 
-    const ctxMetal = document.getElementById('graficaMetales').getContext('2d');
-    new Chart(ctxMetal, {
+    // 2. Gráfica de Productos (Barras)
+    new Chart(document.getElementById('graficaProductos'), {
+        type: 'bar',
+        data: {
+            labels: {{ nombres_prod | tojson }},
+            datasets: [{
+                label: 'Stock Actual',
+                data: {{ cantidades_prod | tojson }},
+                backgroundColor: '#1cc88a',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 3. Gráfica de Metales (Dona)
+    new Chart(document.getElementById('graficaMetales'), {
         type: 'doughnut',
-        data: { labels: tiposMetal, datasets: [{ label: 'Kilos', data: kilosMetal, backgroundColor: ['rgba(0,123,255,0.6)', 'rgba(255,193,7,0.6)', 'rgba(23,162,184,0.6)', 'rgba(220,53,69,0.6)', 'rgba(108,117,125,0.6)'], borderWidth: 1 }] },
-        options: { responsive: true }
+        data: {
+            labels: {{ tipos_metal | tojson }},
+            datasets: [{
+                data: {{ kilos_metal | tojson }},
+                backgroundColor: ['#4e73df', '#f6c23e', '#36b9cc', '#e74a3b', '#858796'],
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '70%'
+        }
     });
 </script>
 {% endblock %}

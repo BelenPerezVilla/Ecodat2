@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width: 600px; margin: 50px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+    <h2 style="margin-top: 0; color: #333; border-bottom: 2px solid #f2f4f6; padding-bottom: 15px;">Crear Nuevo Pedido</h2>
+    
+    <form action="{{ url_for('nuevo_pedido') }}" method="POST" style="margin-top: 25px;">
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #4e73df;">Seleccionar Cliente</label>
+            <select name="id_cliente" style="width: 100%; padding: 12px; border: 1px solid #d1d3e2; border-radius: 8px;" required>
+                <option value="" disabled selected>Busca un cliente...</option>
+                {% for cliente in clientes %}
+                    <option value="{{ cliente.id_cliente }}">{{ cliente.nombre_contacto }} - {{ cliente.empresa }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 30px;">
+            <a href="{{ url_for('lista_pedidos') }}" style="text-align: center; padding: 14px; background: #f8f9fc; color: #5a5c69; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #d1d3e2;">Cancelar</a>
+            <button type="submit" style="padding: 14px; background: #4e73df; color: white; border-radius: 8px; border: none; font-weight: bold; cursor: pointer;">Crear Pedido</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

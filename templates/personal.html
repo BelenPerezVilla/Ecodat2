@@ -1,79 +1,47 @@
 {% extends "base.html" %}
-
 {% block title %}Gestión de Personal{% endblock %}
-
 {% block content %}
 <style>
     .panel-formulario { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end; }
-    
     .input-group { display: flex; flex-direction: column; }
     .input-group label { font-weight: bold; margin-bottom: 5px; color: #4a5568; font-size: 0.9rem; }
     .input-group input, .input-group select { padding: 10px; border: 1px solid #cbd5e0; border-radius: 4px; }
-    
     .btn-guardar { background-color: #38a169; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; height: 40px;}
-    .btn-guardar:hover { background-color: #2f855a; }
-
     .tabla-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow-x: auto;}
     .tabla-personal { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
     .tabla-personal th { background-color: #edf2f7; color: #4a5568; padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e0; }
     .tabla-personal td { padding: 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; }
-    
     .badge-admin { background-color: #fed7d7; color: #9b2c2c; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
     .badge-operador { background-color: #e2e8f0; color: #2d3748; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
 </style>
 
-<div style="margin-bottom: 20px;">
-    <h2 style="color: #2d3748; margin-top: 0;"><i class="fas fa-users"></i> Gestión de Personal y Accesos</h2>
-    <p style="color: #718096; margin-top: 5px;">Registra a tus empleados, asígnales un área (Ventas, Calidad, Maquinaria) y define su nivel de permiso.</p>
-</div>
-
 <div class="panel-formulario">
-    <h3 style="margin-top: 0; color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">Nuevo Empleado</h3>
+    <h3 style="margin-top: 0;">Nuevo Empleado</h3>
     <form action="/personal" method="POST" class="form-grid">
-        
+        <div class="input-group"><label>Usuario</label><input type="text" name="usuario" required></div>
+        <div class="input-group"><label>Contraseña</label><input type="password" name="password" required></div>
         <div class="input-group">
-            <label>Nombre de Usuario</label>
-            <input type="text" name="usuario" placeholder="Ej. juan_ventas" required>
-        </div>
-
-        <div class="input-group">
-            <label>Contraseña Temporal</label>
-            <input type="password" name="password" placeholder="*****" required>
-        </div>
-
-        <div class="input-group">
-            <label>Área Asignada</label>
+            <label>Área</label>
             <select name="id_area" required>
-                <option value="" disabled selected>Selecciona un área...</option>
-                {% for area in areas %}
-                    <option value="{{ area.id_area }}">{{ area.nombre_area }}</option>
-                {% endfor %}
+                {% for area in areas %}<option value="{{ area.id_area }}">{{ area.nombre_area }}</option>{% endfor %}
             </select>
         </div>
-
         <div class="input-group">
-            <label>Nivel de Acceso (Rol)</label>
+            <label>Rol</label>
             <select name="rol" required>
-                <option value="Operador">Operador (Solo registro)</option>
-                <option value="Administrador">Administrador (Control total)</option>
+                <option value="Operador">Operador</option>
+                <option value="Administrador">Administrador</option>
             </select>
         </div>
-
-        <button type="submit" class="btn-guardar"><i class="fas fa-plus"></i> Registrar Personal</button>
+        <button type="submit" class="btn-guardar">Registrar</button>
     </form>
 </div>
 
 <div class="tabla-container">
     <table class="tabla-personal">
         <thead>
-            <tr>
-                <th>ID</th>
-                <th>Usuario</th>
-                <th>Área / Departamento</th>
-                <th>Nivel de Acceso</th>
-                <th>Acciones</th>
-            </tr>
+            <tr><th>ID</th><th>Usuario</th><th>Área</th><th>Rol</th><th>Acciones</th></tr>
         </thead>
         <tbody>
             {% for persona in personal %}
@@ -81,21 +49,11 @@
                 <td>#{{ persona.id }}</td>
                 <td><strong>{{ persona.usuario }}</strong></td>
                 <td>{{ persona.area }}</td>
+                <td><span class="{{ 'badge-admin' if persona.rol == 'Administrador' else 'badge-operador' }}">{{ persona.rol }}</span></td>
                 <td>
-                    {% if persona.rol == 'Administrador' %}
-                        <span class="badge-admin">{{ persona.rol }}</span>
-                    {% else %}
-                        <span class="badge-operador">{{ persona.rol }}</span>
-                    {% endif %}
+                    <a href="{{ url_for('editar_usuario', id=persona.id) }}" style="background:#3182ce; color:white; padding:5px 10px; border-radius:4px; text-decoration:none;">Editar</a>
+                    <a href="{{ url_for('eliminar_usuario', id=persona.id) }}" style="background:#e53e3e; color:white; padding:5px 10px; border-radius:4px; text-decoration:none;" onclick="return confirm('¿Eliminar?')">Borrar</a>
                 </td>
-                <td>
-                    <button style="border:none; background:none; color:#3182ce; cursor:pointer;"><i class="fas fa-edit"></i></button>
-                    <button style="border:none; background:none; color:#e53e3e; cursor:pointer;"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="5" style="text-align: center; color: #718096; padding: 20px;">No hay personal registrado.</td>
             </tr>
             {% endfor %}
         </tbody>

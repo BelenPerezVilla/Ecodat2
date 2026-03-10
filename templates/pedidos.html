@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .tabla-card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 25px; margin-top: 20px; }
+    .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .status-pendiente { background: #fff3cd; color: #856404; }
+    .btn-nuevo { background: #4e73df; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; }
+</style>
+
+<div style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: #333;">📦 Pedidos de Venta</h2>
+        <a href="{{ url_for('nuevo_pedido') }}" class="btn-nuevo">+ Nuevo Pedido</a>
+    </div>
+
+    <div class="tabla-card">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid #f2f4f6; color: #4e73df; text-transform: uppercase; font-size: 0.8rem;">
+                    <th style="padding: 15px; text-align: left;">Folio</th>
+                    <th style="padding: 15px; text-align: left;">Cliente</th>
+                    <th style="padding: 15px; text-align: left;">Fecha</th>
+                    <th style="padding: 15px; text-align: left;">Estado</th>
+                    <th style="padding: 15px; text-align: left;">Total</th>
+                    <th style="padding: 15px; text-align: center;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pedido in pedidos %}
+                <tr style="border-bottom: 1px solid #f8f9fa;">
+                    <td style="padding: 15px;"><strong>#{{ "%04d" | format(pedido.id_pedido) }}</strong></td>
+                    <td style="padding: 15px;">{{ pedido.cliente.nombre_contacto }}</td>
+                    <td style="padding: 15px;">{{ pedido.fecha_pedido.strftime('%d/%m/%Y') }}</td>
+                    <td style="padding: 15px;"><span class="status-badge status-pendiente">{{ pedido.estado }}</span></td>
+                    <td style="padding: 15px;"><strong>${{ "{:,.2f}".format(pedido.total) }}</strong></td>
+                    <td style="padding: 15px; text-align: center;">
+                        <a href="{{ url_for('detalle_pedido', id=pedido.id_pedido) }}" style="color: #4e73df; background: #eaecf4; padding: 8px 12px; border-radius: 6px;">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

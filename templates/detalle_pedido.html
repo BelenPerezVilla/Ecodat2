@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .detalle-container { max-width: 1000px; margin: 30px auto; font-family: 'Segoe UI', sans-serif; }
+    
+    /* Tarjetas de Diseño */
+    .card-resumen { 
+        background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        margin-bottom: 20px; padding: 25px; display: flex; justify-content: space-between; 
+        align-items: center; border-left: 6px solid #4e73df; 
+    }
+    .card-accion { 
+        background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        padding: 25px; margin-bottom: 20px; border: 1px solid #eef0f3; 
+    }
+
+    /* Tablas */
+    .tabla-items { width: 100%; border-collapse: collapse; }
+    .tabla-items th { 
+        text-align: left; padding: 12px; color: #4e73df; font-size: 0.75rem; 
+        border-bottom: 2px solid #f2f4f6; text-transform: uppercase; 
+    }
+    .tabla-items td { padding: 15px; border-bottom: 1px solid #f8f9fa; color: #5a5c69; }
+
+    /* Inputs y Botones */
+    .input-eco { padding: 12px; border: 1px solid #d1d3e2; border-radius: 8px; width: 100%; }
+    .btn-add { 
+        background: #1cc88a; color: white; border: none; padding: 12px; 
+        border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; 
+    }
+    .btn-despachar {
+        background: #4e73df; color: white; border: none; padding: 15px 30px; 
+        border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s;
+        box-shadow: 0 4px 10px rgba(78, 115, 223, 0.2);
+    }
+    .btn-despachar:hover { background: #2e59d9; transform: translateY(-2px); }
+    
+    .badge-estado { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+    .estado-pendiente { background: #fff3cd; color: #856404; }
+    .estado-despachado { background: #e3fcef; color: #0d6832; }
+</style>
+
+<div class="detalle-container">
+    <div style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2 style="color: #333; margin: 0;">Pedido #{{ "%04d" | format(pedido.id_pedido) }}</h2>
+            <span class="badge-estado {% if pedido.estado == 'Pendiente' %}estado-pendiente{% else %}estado-despachado{% endif %}">
+                {{ pedido.estado | upper }}
+            </span>
+        </div>
+        <a href="{{ url_for('lista_pedidos') }}" style="color: #4e73df; text-decoration: none; font-weight: bold;">
+            <i class="fas fa-chevron-left"></i> Volver al Listado
+        </a>
+    </div>
+
+    <div class="card-resumen">
+        <div>
+            <span style="color: #858796; font-size: 0.8rem; font-weight: bold; text-transform: uppercase;">Cliente / Empresa</span>
+            <h3 style="margin: 5px 0 0 0; color: #4e73df;">{{ pedido.cliente.nombre_contacto }}</h3>
+            <p style="margin: 0; color: #858796; font-size: 0.9rem;">{{ pedido.cliente.empresa }}</p>
+        </div>
+        <div style="text-align: right;">
+            <span style="color: #858796; font-size: 0.8rem; font-weight: bold; text-transform: uppercase;">Monto Total de Orden</span>
+            <div style="font-size: 2.2rem; font-weight: bold; color: #2d3748;">${{ "{:,.2f}".format(pedido.total) }}</div>
+        </div>
+    </div>
+
+    {% if pedido.estado == 'Pendiente' %}
+    <div class="card-accion">
+        <h5 style="margin-top: 0; margin-bottom: 20px; color: #5a5c69;"><i class="fas fa-plus-circle"></i> Agregar Producto al Pedido</h5>
+        <form action="{{ url_for('agregar_item', id_pedido=pedido.id_pedido) }}" method="POST">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 20px; align-items: end;">
+                <div>
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #4e73df; display: block; margin-bottom: 5px;">Producto Disponible</label>
+                    <select name="id_producto" class="input-eco" required>
+                        <option value="" disabled selected>Seleccionar...</option>
+                        {% for p_info in productos %}
+                        <option value="{{ p_info.obj.id_producto }}" {% if p_info.stock <= 0 %}disabled{% endif %}>
+                            {{ p_info.obj.nombre_producto }} - ${{ "{:,.2f}".format(p_info.obj.precio) }} 
+                            (Stock: {{ p_info.stock }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem; font-weight: bold; color: #4e73df; display: block; margin-bottom: 5px;">Cantidad</label>
+                    <input type="number" name="cantidad" value="1" min="1" class="input-eco" required>
+                </div>
+                <button type="submit" class="btn-add">Añadir Item</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="card-accion">
+        <h5 style="margin-top: 0; margin-bottom: 15px; color: #5a5c69;">Artículos en la Orden</h5>
+        <table class="tabla-items">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Precio Unit.</th>
+                    <th>Subtotal</th>
+                    {% if pedido.estado == 'Pendiente' %}<th style="text-align: center;">Acción</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in pedido.detalles %}
+                <tr>
+                    <td><strong>{{ item.producto.nombre_producto }}</strong></td>
+                    <td>{{ item.cantidad }} pzas.</td>
+                    <td>${{ "{:,.2f}".format(item.precio_unitario) }}</td>
+                    <td style="color: #1cc88a; font-weight: bold;">${{ "{:,.2f}".format(item.cantidad * item.precio_unitario) }}</td>
+                    {% if pedido.estado == 'Pendiente' %}
+                    <td style="text-align: center;">
+                        <a href="#" style="color: #e74a3b; background: #fdf2f2; padding: 8px 10px; border-radius: 6px;"><i class="fas fa-trash"></i></a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 30px; color: #b7b9cc;">No hay productos en este pedido.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pedido.estado == 'Pendiente' and pedido.detalles %}
+    <div style="text-align: right; margin-top: 20px;">
+        <form action="{{ url_for('despachar_pedido', id_pedido=pedido.id_pedido) }}" method="POST" 
+              onsubmit="return confirm('¿Confirmas el despacho? Se descontarán {{ pedido.detalles|length }} tipos de productos del inventario físico.');">
+            <button type="submit" class="btn-despachar">
+                <i class="fas fa-truck-loading"></i> PROCESAR Y DESPACHAR PEDIDO
+            </button>
+        </form>
+    </div>
+    {% elif pedido.estado == 'Despachado' %}
+    <div style="text-align: center; padding: 20px; background: #f8f9fc; border-radius: 12px; border: 2px dashed #d1d3e2; color: #858796;">
+        <i class="fas fa-check-double fa-2x"></i>
+        <p style="margin-top: 10px; font-weight: bold;">ESTE PEDIDO FUE DESPACHADO Y EL INVENTARIO HA SIDO ACTUALIZADO</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

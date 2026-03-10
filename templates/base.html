@@ -139,6 +139,9 @@
             <a href="/clientes">Directorio de Clientes</a>
             <a href="/ventas">Ventas y Clientes</a>
             <a href="/contabilidad">Administración Contable</a>
+            <a class="collapse-item" href="{{ url_for('lista_pedidos') }}">
+                <i class="fas fa-shopping-basket"></i> Pedidos de Venta
+            </a>
         </div>
 
         <div class="menu-principal" onclick="toggleSubmenu('sub-config')">

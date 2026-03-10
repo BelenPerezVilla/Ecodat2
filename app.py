@@ -1,10 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad, Vehiculo, Chofer, Envio, ProcesoReciclaje, Embarque, Maquinaria, Compra
+from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad, Vehiculo, Chofer, Envio, ProcesoReciclaje, Embarque, Maquinaria, Compra, PedidoVenta, DetallePedido
 from urllib.parse import quote_plus
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.security import generate_password_hash
 from datetime import date
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import func
 from fpdf import FPDF
 from flask import make_response
@@ -13,6 +13,10 @@ import csv
 import io
 from flask import make_response
 import json
+from sqlalchemy import func
+import pandas as pd
+from io import BytesIO
+from flask import send_file 
 
 app = Flask(__name__)
 app.secret_key = 'hola123' # Necesario para las sesiones
@@ -68,32 +72,37 @@ with app.app_context():
 
 
 # Ruta principal: Inicio de sesión
-@app.route('/') # La ruta raíz también te lleva al login
+@app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'usuario' in session:
+        return redirect(url_for('compras')) # Opcional: mandarlos al dashboard
+
+    error = None
     if request.method == 'POST':
-        user = request.form['usuario']
-        passw = request.form['password']
+        usuario_form = request.form.get('usuario')
+        password_form = request.form.get('password')
         
-        # 1. Buscamos al usuario en la tabla de credenciales
-        usuario_db = InicioLog.query.filter_by(usuario=user).first()
+        user_db = InicioLog.query.filter_by(usuario=usuario_form, contrasena=password_form).first()
         
-        # 2. Verificamos si existe y si la contraseña coincide con el hash
-        if usuario_db and check_password_hash(usuario_db.contrasena, passw):
-            session['usuario'] = user
+        if user_db:
+            session['usuario'] = user_db.usuario
+            session['id_area'] = user_db.id_area
             
-            # 3. Buscamos el rol en tu tabla RolUsuario
-            permiso = RolUsuario.query.filter_by(nombre_usuario=user).first()
-            if permiso:
-                session['rol'] = permiso.rol # Guardará 'Administrador' u 'Operador'
+            # NUEVO: Guardamos el nombre del área para los permisos del menú
+            if user_db.area:
+                session['area_nombre'] = user_db.area.nombre_area
             else:
-                session['rol'] = 'Operador' # Por seguridad, si no tiene rol es Operador
-                
-            return redirect(url_for('dashboard'))
-        else:
-            return "Credenciales inválidas, intenta de nuevo."
+                session['area_nombre'] = 'Sin Area'
             
-    return render_template('login.html')
+            rol_db = RolUsuario.query.filter_by(nombre_usuario=user_db.usuario).first()
+            session['rol'] = rol_db.rol if rol_db else 'Operador'
+            
+            return redirect(url_for('compras'))
+        else:
+            error = "Usuario o contraseña incorrectos. Intenta de nuevo."
+            
+    return render_template('login.html', error=error)
 
 @app.route('/areas', methods=['GET', 'POST'])
 def gestion_areas():
@@ -189,7 +198,7 @@ def dashboard():
     if 'usuario' not in session: 
         return redirect(url_for('login'))
     
-    # 1. KPIs Generales
+    # --- 1. KPIs DE INVENTARIO Y PROCESOS (Tu lógica actual) ---
     metales = InventarioMetal.query.all()
     total_kilos = sum(m.cantidad_kg for m in metales if m.cantidad_kg)
     
@@ -198,40 +207,86 @@ def dashboard():
     
     procesos_activos = Proceso.query.filter_by(estado='En progreso').count()
     
-    try:
-        total_ventas = Venta.query.count()
-    except:
-        total_ventas = 0
+    # --- 2. KPIs DE VENTAS (NUEVO) ---
+    # Sumamos el total de dinero de todos los pedidos despachados
+    dinero_total = db.session.query(func.sum(PedidoVenta.total)).scalar() or 0
+    pedidos_pendientes = PedidoVenta.query.filter_by(estado='Pendiente').count()
 
-    # 2. DATOS PARA LAS GRÁFICAS
-    # Gráfica 1: Stock de Productos
+    # --- 3. DATOS PARA LAS GRÁFICAS ---
+    # Gráfica 1: Stock de Productos (Tu lógica actual)
     nombres_prod = []
     cantidades_prod = []
     for inv in productos_inv:
         prod = Producto.query.get(inv.id_producto)
         if prod:
-            # Si hay varios lotes del mismo producto, los mostramos por separado
-            nombres_prod.append(f"{prod.nombre_producto} (Almacén {inv.id_almacen})")
+            nombres_prod.append(f"{prod.nombre_producto} (Alm {inv.id_almacen})")
             cantidades_prod.append(inv.cantidad_stock)
             
-    # Gráfica 2: Kilos de metales
-    tipos_metal = []
-    kilos_metal = []
-    for m in metales:
-        tipos_metal.append(f"{m.tipo_metal} (Lote {m.id_inventario_m})")
-        kilos_metal.append(m.cantidad_kg)
+    # Gráfica 2: Distribución de Metales (Tu lógica actual)
+    tipos_metal = [f"{m.tipo_metal} (Lote {m.id_inventario_m})" for m in metales]
+    kilos_metal = [m.cantidad_kg for m in metales]
+
+    # NUEVA Gráfica 3: Tendencia de Ventas (Últimos 7 días)
+    hoy = datetime.now()
+    hace_siete_dias = hoy - timedelta(days=7)
+    ventas_7_dias = db.session.query(
+        func.date(PedidoVenta.fecha_pedido), 
+        func.sum(PedidoVenta.total)
+    ).filter(PedidoVenta.fecha_pedido >= hace_siete_dias)\
+     .group_by(func.date(PedidoVenta.fecha_pedido)).all()
+
+    labels_ventas = [v[0].strftime('%d %b') for v in ventas_7_dias]
+    valores_ventas = [float(v[1]) for v in ventas_7_dias]
 
     return render_template('dashboard.html', 
                            usuario_actual=session['usuario'],
                            total_kilos=round(total_kilos, 2),
                            total_piezas=total_piezas,
                            procesos_activos=procesos_activos,
-                           total_ventas=total_ventas,
+                           dinero_total=dinero_total,
+                           pedidos_pendientes=pedidos_pendientes,
                            nombres_prod=nombres_prod,
                            cantidades_prod=cantidades_prod,
                            tipos_metal=tipos_metal,
-                           kilos_metal=kilos_metal)
+                           kilos_metal=kilos_metal,
+                           labels_ventas=labels_ventas,
+                           valores_ventas=valores_ventas)
 
+
+@app.route('/exportar_ventas')
+def exportar_ventas():
+    # 1. Consultar todos los pedidos (puedes filtrar por fecha si gustas)
+    pedidos = PedidoVenta.query.all()
+    
+    # 2. Crear una lista de diccionarios con la información
+    data = []
+    for p in pedidos:
+        data.append({
+            "Folio": f"#{p.id_pedido:04d}",
+            "Fecha": p.fecha_pedido.strftime('%Y-%m-%d'),
+            "Cliente": p.cliente.nombre_contacto if p.cliente else "N/A",
+            "Empresa": p.cliente.empresa if p.cliente else "N/A",
+            "Estado": p.estado,
+            "Total Venta ($)": p.total
+        })
+    
+    # 3. Convertir a un DataFrame de Pandas
+    df = pd.DataFrame(data)
+    
+    # 4. Crear el archivo Excel en memoria (sin guardarlo en el disco del servidor)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Reporte de Ventas')
+    
+    output.seek(0)
+    
+    # 5. Enviar el archivo al usuario
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f"Reporte_Ventas_EcoData_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    )
 
 # --- MÓDULO BODEGAS (MATERIA PRIMA) ---
 @app.route('/bodegas', methods=['GET', 'POST'])
@@ -394,19 +449,49 @@ def productos():
     if request.method == 'POST':
         nombre_producto = request.form['nombre_producto']
         descripcion = request.form.get('descripcion', '') 
+        # Convertimos el precio a float para la base de datos
+        precio = float(request.form.get('precio', 0.0))
         
-        # Creamos el producto solo con los campos de tu modelo
+        # Creamos el producto con el nuevo campo 'precio'
         nuevo_producto = Producto(
             nombre_producto=nombre_producto, 
-            descripcion=descripcion
+            descripcion=descripcion,
+            precio=precio # Asegúrate que tu modelo Producto tenga este campo
         )
-        db.session.add(nuevo_producto)
-        db.session.commit()
         
+        try:
+            db.session.add(nuevo_producto)
+            db.session.commit()
+            flash("Producto registrado con éxito", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error al registrar: {str(e)}", "danger")
+            
         return redirect(url_for('productos'))
         
     lista_productos = Producto.query.all()
     return render_template('productos.html', productos=lista_productos)
+
+
+@app.route('/editar_producto/<int:id>', methods=['POST'])
+def editar_producto(id):
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    producto = Producto.query.get_or_404(id)
+    
+    try:
+        producto.nombre_producto = request.form['nombre_producto']
+        producto.descripcion = request.form['descripcion']
+        producto.precio = float(request.form['precio'])
+        
+        db.session.commit()
+        flash(f"Producto {producto.nombre_producto} actualizado correctamente.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al actualizar: {str(e)}", "danger")
+        
+    return redirect(url_for('productos'))
 
 @app.route('/mantenimiento', methods=['GET', 'POST'])
 def mantenimiento():
@@ -1266,7 +1351,124 @@ def exportar_inventario():
     
     return output
 
+@app.route('/pedidos')
+def lista_pedidos():
+    # Usamos PedidoVenta que ya está conectado a tu clase Cliente
+    pedidos = PedidoVenta.query.order_by(PedidoVenta.fecha_pedido.desc()).all()
+    return render_template('pedidos.html', pedidos=pedidos)
 
+@app.route('/nuevo_pedido', methods=['GET', 'POST'])
+def nuevo_pedido():
+    if request.method == 'POST':
+        id_cliente = request.form.get('id_cliente')
+        nuevo_p = PedidoVenta(id_cliente=id_cliente, estado='Pendiente', total=0.0)
+        try:
+            db.session.add(nuevo_p)
+            db.session.commit()
+            return redirect(url_for('detalle_pedido', id=nuevo_p.id_pedido))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error al crear pedido: {str(e)}", "danger")
+            
+    clientes = Cliente.query.all()
+    return render_template('nuevo_pedido.html', clientes=clientes)
+
+@app.route('/pedido/<int:id>')
+def detalle_pedido(id):
+    pedido = PedidoVenta.query.get_or_404(id)
+    # Consultamos productos y calculamos su stock actual manualmente para el select
+    productos_con_stock = []
+    todos_los_productos = Producto.query.all()
+    
+    for p in todos_los_productos:
+        stock = db.session.query(func.sum(InventarioProducto.cantidad_stock))\
+            .filter(InventarioProducto.id_producto == p.id_producto).scalar() or 0
+        productos_con_stock.append({'obj': p, 'stock': stock})
+        
+    return render_template('detalle_pedido.html', pedido=pedido, productos=productos_con_stock)
+
+
+@app.route('/despachar_pedido/<int:id_pedido>', methods=['POST'])
+def despachar_pedido(id_pedido):
+    pedido = PedidoVenta.query.get_or_404(id_pedido)
+    
+    if pedido.estado != 'Pendiente':
+        flash("Este pedido ya fue procesado anteriormente.", "warning")
+        return redirect(url_for('detalle_pedido', id=id_pedido))
+
+    try:
+        # 1. Recorrer los artículos del pedido para restar del inventario
+        for item in pedido.detalles:
+            # Buscamos el registro en InventarioProducto para ese ID de producto
+            # (Si manejas varias bodegas, podrías filtrar también por id_almacen)
+            inventario = InventarioProducto.query.filter_by(id_producto=item.id_producto).first()
+            
+            if inventario:
+                if inventario.cantidad_stock >= item.cantidad:
+                    inventario.cantidad_stock -= item.cantidad
+                else:
+                    # Una última validación de seguridad
+                    flash(f"Error: Stock insuficiente para {item.producto.nombre_producto}", "danger")
+                    db.session.rollback()
+                    return redirect(url_for('detalle_pedido', id=id_pedido))
+            else:
+                flash(f"El producto {item.id_producto} no existe en inventario.", "danger")
+                db.session.rollback()
+                return redirect(url_for('detalle_pedido', id=id_pedido))
+
+        # 2. Cambiar el estado del pedido
+        pedido.estado = 'Despachado'
+        
+        db.session.commit()
+        flash(f"Pedido #{id_pedido:04d} despachado con éxito. Inventario actualizado.", "success")
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error crítico: {str(e)}", "danger")
+        
+    return redirect(url_for('lista_pedidos'))
+
+@app.route('/agregar_item/<int:id_pedido>', methods=['POST'])
+def agregar_item(id_pedido):
+    id_prod = request.form.get('id_producto')
+    qty_solicitada = int(request.form.get('cantidad'))
+    
+    # 1. Obtener el producto y su precio
+    prod = Producto.query.get_or_404(id_prod)
+    precio_vta = prod.precio  # Usamos la nueva columna precio de tu BD
+    
+    # 2. VALIDACIÓN DE INVENTARIO
+    # Sumamos todo el stock disponible para este producto en todos los almacenes
+    stock_disponible = db.session.query(func.sum(InventarioProducto.cantidad_stock))\
+        .filter(InventarioProducto.id_producto == id_prod).scalar() or 0
+    
+    if qty_solicitada > stock_disponible:
+        flash(f"Stock insuficiente. Solo tienes {stock_disponible} unidades de {prod.nombre_producto}.", "danger")
+        return redirect(url_for('detalle_pedido', id=id_pedido))
+    
+    # 3. Si hay stock, procedemos a guardar
+    subtotal = precio_vta * qty_solicitada
+    
+    nuevo_item = DetallePedido(
+        id_pedido=id_pedido,
+        id_producto=id_prod,
+        cantidad=qty_solicitada,
+        precio_unitario=precio_vta
+    )
+    
+    # Actualizar el total de la cabecera del pedido
+    pedido = PedidoVenta.query.get(id_pedido)
+    pedido.total += subtotal
+    
+    try:
+        db.session.add(nuevo_item)
+        db.session.commit()
+        flash(f"¡{prod.nombre_producto} agregado correctamente!", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al guardar: {str(e)}", "danger")
+        
+    return redirect(url_for('detalle_pedido', id=id_pedido))
 
 # --- MÓDULO DE PRIVILEGIOS Y GESTIÓN DE USUARIOS ---
 @app.route('/usuarios', methods=['GET', 'POST'])
@@ -1315,74 +1517,37 @@ def usuarios():
     lista_usuarios = RolUsuario.query.all()
     return render_template('usuarios.html', lista_usuarios=lista_usuarios)
 
-# --- RUTA PARA ELIMINAR USUARIO ---
-@app.route('/eliminar_usuario/<int:id_rol>')
-def eliminar_usuario(id_rol):
-    # 1. Verificación de seguridad: Solo el Administrador puede borrar
-    if 'usuario' not in session or session.get('rol') != 'Administrador':
-        return redirect(url_for('login'))
-
-    # 2. Buscamos el registro en la tabla de roles
-    usuario_rol = RolUsuario.query.get_or_404(id_rol)
-    nombre = usuario_rol.nombre_usuario
-
-    # 3. Evitar que el administrador se borre a sí mismo por accidente
-    if nombre == session.get('usuario'):
-        # Puedes retornar un mensaje de error o simplemente redirigir
-        return redirect(url_for('usuarios'))
-
-    # 4. Buscamos el registro correspondiente en la tabla de login
-    usuario_login = InicioLog.query.filter_by(usuario=nombre).first()
-
-    try:
-        # Borramos de ambas tablas
-        db.session.delete(usuario_rol)
-        if usuario_login:
-            db.session.delete(usuario_login)
-        
+# ==========================================
+# RUTAS PARA EDITAR Y ELIMINAR USUARIOS
+# ==========================================
+@app.route('/eliminar_usuario/<int:id>')
+def eliminar_usuario(id):
+    usuario = InicioLog.query.get(id) # .get usa la primary_key (id_usuario)
+    if usuario:
+        rol = RolUsuario.query.filter_by(nombre_usuario=usuario.usuario).first()
+        if rol: db.session.delete(rol)
+        db.session.delete(usuario)
         db.session.commit()
-    except:
-        db.session.rollback()
-        return "Error al intentar eliminar el usuario."
+    return redirect(url_for('personal'))
 
-    return redirect(url_for('usuarios'))
-
-@app.errorhandler(403)
-def access_denied(e):
-    return render_template('403.html'), 403
-
-@app.errorhandler(404)
-def page_not_found(e):
-    return render_template('404.html'), 404
-
-# --- RUTA PARA EDITAR USUARIO ---
 @app.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
 def editar_usuario(id):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-        
-    usuario_a_editar = InicioLog.query.get_or_404(id)
-    lista_areas = Area.query.all()
-    
+    usuario = InicioLog.query.get_or_404(id)
+    rol_reg = RolUsuario.query.filter_by(nombre_usuario=usuario.usuario).first()
+    rol_actual = rol_reg.rol if rol_reg else "Operador"
+
     if request.method == 'POST':
-        usuario_a_editar.usuario = request.form['usuario']
-        usuario_a_editar.id_area = request.form.get('id_area')
-        
-        # Solo actualizamos la contraseña si el campo no está vacío
-        nueva_contra = request.form['contrasena']
-        if nueva_contra.strip() != "":
-            usuario_a_editar.contrasena = nueva_contra
-            
+        usuario.id_area = request.form.get('id_area')
+        nuevo_rol = request.form.get('rol')
+        if rol_reg:
+            rol_reg.rol = nuevo_rol
+        else:
+            db.session.add(RolUsuario(nombre_usuario=usuario.usuario, rol=nuevo_rol))
         db.session.commit()
-        flash('Usuario actualizado correctamente.', 'success')
-        return redirect(url_for('usuarios'))
-        
-    return render_template('editar_usuario.html', 
-                           user=usuario_a_editar, 
-                           areas=lista_areas, 
-                           usuario_actual=session['usuario'])
+        return redirect(url_for('personal'))
 
-
+    areas = Area.query.all()
+    return render_template('editar_usuario.html', persona=usuario, areas=areas, rol_actual=rol_actual)
 @app.route('/actualizar_bd')
 def actualizar_bd():
     try:

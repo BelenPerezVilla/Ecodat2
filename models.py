@@ -49,6 +49,7 @@ class Producto(db.Model):
     nombre_producto = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text)
     inventario_producto = db.relationship('InventarioProducto', backref='producto', lazy=True)
+    precio = db.Column(db.Float, default=0.0) # <--- Agrega esta línea
 
 # Tabla de Inventario de Metal (Materia Prima)
 class InventarioMetal(db.Model):
@@ -247,3 +248,28 @@ class Compra(db.Model):
 
     # Relación para jalar el nombre del proveedor automáticamente
     proveedor = db.relationship('Proveedor', backref='compras_realizadas')
+
+class PedidoVenta(db.Model):
+    __tablename__ = 'pedidos_venta'
+    id_pedido = db.Column(db.Integer, primary_key=True)
+    id_cliente = db.Column(db.Integer, db.ForeignKey('cliente.id_cliente'))
+    cliente = db.relationship('Cliente', backref='pedidos')
+     # Asegúrate que tu tabla clientes use id_cliente
+    fecha_pedido = db.Column(db.DateTime, default=db.func.current_timestamp())
+    estado = db.Column(db.String(20), default='Pendiente')
+    total = db.Column(db.Float, default=0.0)
+    
+    # Esta es la línea que causaba el error, ahora ya tendrá a quién buscar
+    detalles = db.relationship('DetallePedido', backref='pedido', lazy=True)
+
+class DetallePedido(db.Model):
+    __tablename__ = 'detalle_pedido'
+    id_detalle = db.Column(db.Integer, primary_key=True)
+    id_pedido = db.Column(db.Integer, db.ForeignKey('pedidos_venta.id_pedido'), nullable=False)
+    id_producto = db.Column(db.Integer, db.ForeignKey('producto.id_producto'))
+    cantidad = db.Column(db.Integer, nullable=False)
+    precio_unitario = db.Column(db.Float, nullable=False)
+
+    # ESTA ES LA LÍNEA QUE FALTA:
+    # Le dice a SQLAlchemy: "Cuando pida .producto, búscalo en la clase Producto"
+    producto = db.relationship('Producto', backref='detalles_pedido')
