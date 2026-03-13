@@ -17,6 +17,8 @@ from sqlalchemy import func
 import pandas as pd
 from io import BytesIO
 from flask import send_file 
+from functools import wraps
+from flask import session, redirect, url_for, flash 
 
 app = Flask(__name__)
 app.secret_key = 'hola123' # Necesario para las sesiones
@@ -69,7 +71,22 @@ with app.app_context():
         db.session.add_all([prod1, prod2])
         db.session.commit()
 
-
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 1. Verificamos si alguien inició sesión
+        if 'usuario' not in session:
+            flash("Por favor, inicia sesión para continuar.", "error")
+            return redirect(url_for('login'))
+            
+        # 2. Verificamos si su rol es Administrador
+        if session.get('rol') != 'Administrador':
+            flash("Acceso denegado. Esta sección es exclusiva para Administradores.", "error")
+            return redirect(url_for('compras')) # O la ruta de tu dashboard principal
+            
+        # Si pasa las dos pruebas, lo dejamos entrar a la ruta original
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Ruta principal: Inicio de sesión
 @app.route('/', methods=['GET', 'POST'])
@@ -659,6 +676,7 @@ def actualizar_maquina(id_maquina):
 
 # --- MÓDULO DE ADMINISTRACIÓN CONTABLE ---
 @app.route('/contabilidad', methods=['GET', 'POST'])
+@admin_required
 def contabilidad():
     if 'usuario' not in session:
         return redirect(url_for('login'))
@@ -1548,6 +1566,43 @@ def editar_usuario(id):
 
     areas = Area.query.all()
     return render_template('editar_usuario.html', persona=usuario, areas=areas, rol_actual=rol_actual)
+
+@app.route('/privilegios', methods=['GET', 'POST'])
+@admin_required
+def privilegios():
+    # 1. Seguridad básica: Solo administradores pueden entrar aquí
+    if 'usuario' not in session or session.get('rol') != 'Administrador':
+        flash("Acceso denegado. Solo administradores pueden gestionar privilegios.", "error")
+        return redirect(url_for('compras')) # O la ruta que uses como inicio
+
+    # 2. Si se envía el formulario para cambiar un rol
+    if request.method == 'POST':
+        usuario_modificado = request.form.get('nombre_usuario')
+        nuevo_rol = request.form.get('rol')
+        
+        # Buscamos si ya tiene un registro en la tabla RolUsuario
+        rol_existente = RolUsuario.query.filter_by(nombre_usuario=usuario_modificado).first()
+        
+        if rol_existente:
+            rol_existente.rol = nuevo_rol
+        else:
+            # Si por alguna razón no estaba en la tabla de roles, lo creamos
+            nuevo_registro = RolUsuario(nombre_usuario=usuario_modificado, rol=nuevo_rol)
+            db.session.add(nuevo_registro)
+            
+        db.session.commit()
+        flash(f"Privilegios actualizados: {usuario_modificado} ahora es {nuevo_rol}.", "success")
+        return redirect(url_for('privilegios'))
+
+    # 3. GET: Traer todos los usuarios para mostrarlos en la tabla
+    usuarios_db = InicioLog.query.all()
+    
+    # Creamos un diccionario rápido con los roles actuales para mostrar en el HTML
+    # Quedará algo así: {'admin': 'Administrador', 'juan': 'Operador'}
+    roles_asignados = {r.nombre_usuario: r.rol for r in RolUsuario.query.all()}
+
+    return render_template('privilegios.html', usuarios=usuarios_db, roles_asignados=roles_asignados)
+
 @app.route('/actualizar_bd')
 def actualizar_bd():
     try:
