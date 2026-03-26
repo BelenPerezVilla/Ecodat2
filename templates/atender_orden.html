@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;">
+    <div style="background: #4e73df; color: white; padding: 20px; display: flex; align-items: center;">
+        <i class="fas fa-wrench" style="margin-right: 15px; font-size: 1.5em;"></i>
+        <h4 style="margin: 0;">Resolviendo Alerta: {{ maquina.nombre }}</h4>
+    </div>
+
+    <form action="{{ url_for('mantenimiento') }}" method="POST" enctype="multipart/form-data" style="padding: 30px;">
+        <input type="hidden" name="accion" value="registrar_mantenimiento">
+        <input type="hidden" name="id_maquina" value="{{ maquina.id_maquina }}">
+        <input type="hidden" name="fecha" value="{{ hoy }}">
+
+        <div style="background: #f8f9fc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4e73df;">
+            <small style="color: #858796; font-weight: bold;">ÚLTIMO SERVICIO:</small> {{ maquina.nombre }}<br>
+            <small style="color: #e74a3b; font-weight: bold;">VENCIÓ EL:</small> {{ hoy.strftime('%d/%m/%Y') }}
+        </div>
+
+        <label style="font-weight: bold; color: #5a5c69;">Tipo de Atención:</label>
+        <select name="tipo" style="width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #d1d3e2;">
+            <option value="Preventivo">Preventivo (Rutina)</option>
+            <option value="Correctivo">Correctivo (Reparación)</option>
+        </select>
+
+        <label style="font-weight: bold; color: #5a5c69;">Descripción de lo realizado:</label>
+        <textarea name="descripcion" placeholder="Escribe el reporte técnico..." required style="width: 100%; height: 100px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #d1d3e2; padding: 10px;"></textarea>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+                <label style="font-weight: bold; color: #5a5c69;">Costo del Servicio $:</label>
+                <input type="number" step="0.01" name="costo" required style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #d1d3e2;">
+            </div>
+            <div>
+                <label style="font-weight: bold; color: #4e73df;">Próxima Revisión:</label>
+                <input type="date" name="fecha_proxima" required style="width: 100%; padding: 10px; border-radius: 5px; border: 2px solid #4e73df; background: #f0f4ff;">
+            </div>
+        </div>
+
+        <div style="background: #eef2ff; padding: 15px; border-radius: 8px; border: 1px dashed #4e73df; margin-bottom: 25px;">
+            <label style="font-weight: bold; color: #4e73df;"><i class="fas fa-camera"></i> Adjuntar Evidencia:</label>
+            <input type="file" name="foto" accept="image/*" capture="environment" style="width: 100%; margin-top: 5px;">
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" style="flex: 2; background: #1cc88a; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer;">FINALIZAR Y CERRAR ALERTA</button>
+            <a href="{{ url_for('mantenimiento') }}" style="flex: 1; background: #858796; color: white; text-align: center; padding: 15px; text-decoration: none; border-radius: 8px; font-weight: bold;">CANCELAR</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

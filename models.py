@@ -143,6 +143,8 @@ class Mantenimiento(db.Model):
     fecha = db.Column(db.Date, nullable=False)
     costo = db.Column(db.Float, default=0.0)
     tecnico = db.Column(db.String(100))
+    fecha_proxima = db.Column(db.Date, nullable=True) 
+    foto_evidencia = db.Column(db.String(150), nullable=True) # Ruta o URL de la foto
 
     maquina = db.relationship('Maquina', backref='historial_mantenimiento', lazy=True)
 class Calidad(db.Model):
@@ -273,3 +275,14 @@ class DetallePedido(db.Model):
     # ESTA ES LA LÍNEA QUE FALTA:
     # Le dice a SQLAlchemy: "Cuando pida .producto, búscalo en la clase Producto"
     producto = db.relationship('Producto', backref='detalles_pedido')
+
+
+class Auditoria(db.Model):
+    __tablename__ = 'auditoria'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    usuario = db.Column(db.String(50))
+    accion = db.Column(db.String(100))
+    modulo = db.Column(db.String(50))
+    detalle = db.Column(db.Text)
+    ip = db.Column(db.String(20))

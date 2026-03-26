@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Bitácora de Auditoría - Ecodata{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper" style="padding: 25px; background-color: #f8f9fc; min-height: 100vh;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px;">
+        <div>
+            <h2 style="color: #333; margin: 0; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-history" style="color: #4e73df;"></i> 
+                Bitácora de Movimientos
+            </h2>
+            <p style="color: #858796; margin-top: 5px;">Historial completo de acciones realizadas por los usuarios en el sistema.</p>
+        </div>
+        
+        <div style="position: relative;">
+            <i class="fas fa-search" style="position: absolute; left: 12px; top: 12px; color: #d1d3e2;"></i>
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar usuario, acción o detalle..." 
+                   style="padding: 10px 15px 10px 35px; border-radius: 20px; border: 1px solid #d1d3e2; width: 300px; outline: none; transition: 0.3s;">
+        </div>
+    </div>
+
+    <div style="background: white; border-radius: 12px; border: 1px solid #eef0f3; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+        <table id="auditTable" style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="background-color: #4e73df; color: white;">
+                    <th style="padding: 15px; width: 180px;">Fecha y Hora</th>
+                    <th style="padding: 15px; width: 120px;">Usuario</th>
+                    <th style="padding: 15px; width: 130px;">Acción</th>
+                    <th style="padding: 15px; width: 130px;">Módulo</th>
+                    <th style="padding: 15px;">Detalle del Movimiento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in registros %}
+                <tr style="border-bottom: 1px solid #f1f1f1; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#fcfdff'" onmouseout="this.style.backgroundColor='transparent'">
+                    <td style="padding: 15px; font-size: 0.9em; color: #858796;">
+                        <i class="far fa-clock"></i> {{ log.fecha.strftime('%d/%m/%Y %H:%M:%S') }}
+                    </td>
+                    <td style="padding: 15px;">
+                        <span style="font-weight: bold; color: #5a5c69;">{{ log.usuario }}</span>
+                    </td>
+                    <td style="padding: 15px;">
+                        <span style="padding: 4px 10px; border-radius: 15px; font-size: 0.75em; font-weight: bold; text-transform: uppercase; color: white;
+                              background-color: {% if log.accion == 'Eliminar' or log.accion == 'Intento Fallido' %}#e74a3b{% elif log.accion == 'Login' %}#36b9cc{% elif log.accion == 'Compra' %}#1cc88a{% else %}#4e73df{% endif %};">
+                            {{ log.accion }}
+                        </span>
+                    </td>
+                    <td style="padding: 15px; font-size: 0.9em; color: #5a5c69;">
+                        <i class="fas fa-folder-open" style="color: #d1d3e2; margin-right: 5px;"></i>{{ log.modulo }}
+                    </td>
+                    <td style="padding: 15px; font-size: 0.95em;">
+                        {% if "total" in log.detalle or "$" in log.detalle %}
+                            <span style="color: #1cc88a; font-weight: 600;">{{ log.detalle }}</span>
+                        {% elif "rol" in log.detalle or "Privilegios" in log.detalle %}
+                            <span style="color: #4e73df; font-style: italic;">{{ log.detalle }}</span>
+                        {% else %}
+                            {{ log.detalle }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; color: #858796; font-size: 0.85em;">
+        <div>Mostrando {{ registros|length }} registros recientes</div>
+        <a href="{{ url_for('dashboard') }}" style="text-decoration: none; color: #4e73df; font-weight: bold;">
+            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+    // Función para filtrar la tabla en tiempo real
+    function filterTable() {
+        var input, filter, table, tr, td, i, j, txtValue;
+        input = document.getElementById("searchInput");
+        filter = input.value.toUpperCase();
+        table = document.getElementById("auditTable");
+        tr = table.getElementsByTagName("tr");
+
+        for (i = 1; i < tr.length; i++) {
+            tr[i].style.display = "none";
+            td = tr[i].getElementsByTagName("td");
+            for (j = 0; j < td.length; j++) {
+                if (td[j]) {
+                    txtValue = td[j].textContent || td[j].innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Estilo de enfoque para el buscador
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('focus', () => {
+        searchInput.style.borderColor = '#4e73df';
+        searchInput.style.boxShadow = '0 0 0 0.2rem rgba(78, 115, 223, 0.25)';
+    });
+    searchInput.addEventListener('blur', () => {
+        searchInput.style.borderColor = '#d1d3e2';
+        searchInput.style.boxShadow = 'none';
+    });
+</script>
+{% endblock %}

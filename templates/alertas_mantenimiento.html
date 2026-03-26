@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="padding: 20px; background-color: #f8f9fc; min-height: 100vh;">
+    
+    <div style="background: #fff3cd; border-left: 5px solid #ffc107; padding: 20px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <h5 style="color: #856404; margin: 0; font-weight: bold;">Panel de Atención Prioritaria</h5>
+        <p style="color: #856404; margin: 5px 0 0 0;">
+            Tienes <strong>{{ alertas|length }}</strong> mantenimientos vencidos o próximos a vencer esta semana.
+        </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+        {% for a in alertas %}
+        <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #ffc107;">
+            <div style="background: #fdf7e3; padding: 10px 15px; border-bottom: 1px solid #f8f1d8;">
+                <span style="font-size: 0.8em; font-weight: bold; color: #856404;">ID MÁQUINA: {{ a.id_maquina }}</span>
+            </div>
+            
+            <div style="padding: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <small style="color: #b7b9cc; font-weight: bold; text-transform: uppercase; font-size: 0.7em;">Estado de Alerta</small>
+                    <div style="color: #e74a3b; font-weight: bold; font-size: 1.1em;">VENCE PRONTO</div>
+                </div>
+
+                <div style="background: #f8f9fc; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="font-size: 0.85em; margin-bottom: 5px;">
+                        <strong>Programado para:</strong> {{ a.fecha_proxima.strftime('%d/%m/%Y') }}
+                    </div>
+                    <div style="font-size: 0.85em;">
+                        <strong>Último Técnico:</strong> {{ a.tecnico or 'No asignado' }}
+                    </div>
+                </div>
+
+                <a href="/mantenimiento/atender/{{ a.id_maquina }}" 
+                   style="display: block; text-align: center; background: #4e73df; color: white; text-decoration: none; padding: 12px; border-radius: 8px; font-weight: bold; transition: background 0.3s;">
+                    Abrir Bitácora y Atender
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div style="grid-column: 1 / -1; text-align: center; padding: 50px; color: #1cc88a;">
+            <i class="fas fa-check-circle fa-4x" style="margin-bottom: 15px;"></i>
+            <h3>¡Todo al día!</h3>
+            <p>No hay equipos con mantenimientos pendientes actualmente.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

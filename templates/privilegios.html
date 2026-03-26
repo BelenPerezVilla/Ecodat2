@@ -1,79 +1,95 @@
 {% extends "base.html" %}
 
-{% block title %}Gestión de Privilegios{% endblock %}
+{% block title %}Gestión de Privilegios - Ecodata{% endblock %}
 
 {% block content %}
-<style>
-    .card-privilegios { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
-    .table-privilegios { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    .table-privilegios th, .table-privilegios td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-    .table-privilegios th { background-color: #343a40; color: white; }
-    .table-privilegios tr:nth-child(even) { background-color: #f2f2f2; }
+<div class="dashboard-wrapper" style="padding: 25px; background-color: #f8f9fc; min-height: 100vh;">
     
-    .btn-update { background-color: #007bff; color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
-    .btn-update:hover { background-color: #0056b3; }
-    select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
-    
-    .badge-admin { background-color: #dc3545; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.85em; }
-    .badge-operador { background-color: #28a745; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.85em; }
-</style>
-
-<h2>Gestión de Privilegios y Accesos</h2>
-
-<div class="card-privilegios">
-    <p>Asigna o revoca permisos de administrador a los usuarios del sistema.</p>
+    <div style="margin-bottom: 30px;">
+        <h2 style="color: #333; margin: 0; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-user-shield" style="color: #4e73df;"></i> 
+            Gestión de Privilegios y Accesos
+        </h2>
+        <p style="color: #858796; margin-top: 5px;">Asigna o revoca permisos de administrador a los usuarios del sistema.</p>
+    </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}" style="padding: 10px; margin-bottom: 10px; border-radius: 5px; background-color: #d4edda; color: #155724;">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert" style="padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid transparent; 
+               {% if category == 'success' %} background-color: #d4edda; color: #155724; border-color: #c3e6cb; 
+               {% else %} background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; {% endif %}">
+            <i class="fas {% if category == 'success' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
     {% endwith %}
 
-    <table class="table-privilegios">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Usuario</th>
-                <th>Área</th>
-                <th>Rol Actual</th>
-                <th>Acción</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for u in usuarios %}
-            <tr>
-                <td>{{ u.id_usuario }}</td>
-                <td><strong>{{ u.usuario }}</strong></td>
-                <td>{{ u.area.nombre_area if u.area else 'Sin Área' }}</td>
-                
-                {# Obtenemos el rol del diccionario, si no tiene, por defecto es Operador #}
-                {% set rol_actual = roles_asignados.get(u.usuario, 'Operador') %}
-                
-                <td>
-                    {% if rol_actual == 'Administrador' %}
-                        <span class="badge-admin">Administrador</span>
-                    {% else %}
-                        <span class="badge-operador">Operador</span>
-                    {% endif %}
-                </td>
-                
-                <td>
-                    <form method="POST" action="/privilegios" style="display: flex; gap: 10px; align-items: center;">
-                        <input type="hidden" name="nombre_usuario" value="{{ u.usuario }}">
-                        <select name="rol">
-                            <option value="Operador" {% if rol_actual == 'Operador' %}selected{% endif %}>Operador</option>
-                            <option value="Administrador" {% if rol_actual == 'Administrador' %}selected{% endif %}>Administrador</option>
-                        </select>
-                        <button type="submit" class="btn-update">Actualizar</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div style="background: white; border-radius: 12px; border: 1px solid #eef0f3; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="background-color: #4e73df; color: white;">
+                    <th style="padding: 15px;">ID</th>
+                    <th style="padding: 15px;">Usuario</th>
+                    <th style="padding: 15px;">Área</th>
+                    <th style="padding: 15px;">Rol Actual</th>
+                    <th style="padding: 15px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr style="border-bottom: 1px solid #f1f1f1; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#fcfdff'" onmouseout="this.style.backgroundColor='transparent'">
+                    <td style="padding: 15px; color: #858796;">{{ u.id }}</td>
+                    <td style="padding: 15px;"><strong>{{ u.usuario }}</strong></td>
+                    <td style="padding: 15px;">
+                        <span style="background: #f8f9fc; padding: 4px 8px; border-radius: 4px; font-size: 0.9em; color: #5a5c69; border: 1px solid #eaecf4;">
+                            {{ u.area.nombre_area if u.area else 'Sin Área' }}
+                        </span>
+                    </td>
+                    <td style="padding: 15px;">
+                        {% set rol = roles_asignados.get(u.usuario, 'Operador') %}
+                        <span style="padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold; color: white;
+                              background-color: {% if rol == 'Administrador' %}#e74a3b{% else %}#1cc88a{% endif %};">
+                            {{ rol }}
+                        </span>
+                    </td>
+                    <td style="padding: 15px;">
+                        <form action="{{ url_for('privilegios') }}" method="POST" style="display: flex; gap: 10px; align-items: center;">
+                            <input type="hidden" name="nombre_usuario" value="{{ u.usuario }}">
+                            
+                            <select name="rol" style="padding: 6px; border-radius: 5px; border: 1px solid #d1d3e2; color: #6e707e;">
+                                <option value="Operador" {% if rol == 'Operador' %}selected{% endif %}>Operador</option>
+                                <option value="Administrador" {% if rol == 'Administrador' %}selected{% endif %}>Administrador</option>
+                            </select>
+
+                            <button type="submit" style="background-color: #4e73df; color: white; border: none; padding: 7px 15px; border-radius: 5px; cursor: pointer; font-size: 0.85em; transition: 0.3s;">
+                                <i class="fas fa-sync-alt"></i> Actualizar
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('dashboard') }}" style="text-decoration: none; color: #858796; font-size: 0.9em;">
+            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+        </a>
+    </div>
 </div>
+
+<style>
+    /* Efecto hover para el botón */
+    button:hover { background-color: #2e59d9 !important; box-shadow: 0 4px 8px rgba(78, 115, 223, 0.3); }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .dashboard-wrapper { padding: 10px; }
+        table { font-size: 0.8em; }
+        select { width: 100px; }
+    }
+</style>
 {% endblock %}

@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad, Vehiculo, Chofer, Envio, ProcesoReciclaje, Embarque, Maquinaria, Compra, PedidoVenta, DetallePedido
+from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad, Vehiculo, Chofer, Envio, ProcesoReciclaje, Embarque, Maquinaria, Compra, PedidoVenta, DetallePedido, Auditoria
 from urllib.parse import quote_plus
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
+import os
 from datetime import date
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -88,38 +90,70 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def registrar_log(accion, modulo, detalle):
+    nuevo_log = Auditoria(
+        usuario = session.get('usuario', 'Sistema'),
+        accion = accion,
+        modulo = modulo,
+        detalle = detalle,
+        ip = request.remote_addr
+    )
+    db.session.add(nuevo_log)
+    db.session.commit()
+
+
+
+@app.route('/auditoria')
+@admin_required  # Usamos el decorador que creamos al principio para que solo el admin lo vea
+def ver_auditoria():
+    # Consultamos todos los registros, los más recientes primero
+    registros = Auditoria.query.order_by(Auditoria.fecha.desc()).all()
+    return render_template('auditoria.html', registros=registros)
+
 # Ruta principal: Inicio de sesión
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'usuario' in session:
-        return redirect(url_for('compras')) # Opcional: mandarlos al dashboard
+        return redirect(url_for('dashboard'))
 
     error = None
+
     if request.method == 'POST':
         usuario_form = request.form.get('usuario')
         password_form = request.form.get('password')
-        
+
+        # 2. Buscamos al usuario en la tabla InicioLog (según tu imagen)
         user_db = InicioLog.query.filter_by(usuario=usuario_form, contrasena=password_form).first()
-        
+
         if user_db:
+            # 3. Guardamos datos básicos en la sesión
             session['usuario'] = user_db.usuario
             session['id_area'] = user_db.id_area
             
-            # NUEVO: Guardamos el nombre del área para los permisos del menú
+            # 4. Manejo del nombre del área (evita errores si no tiene área asignada)
             if user_db.area:
                 session['area_nombre'] = user_db.area.nombre_area
             else:
-                session['area_nombre'] = 'Sin Area'
-            
+                session['area_nombre'] = 'Sin Área'
+
+            # 5. Consultar y guardar el ROL del usuario
             rol_db = RolUsuario.query.filter_by(nombre_usuario=user_db.usuario).first()
             session['rol'] = rol_db.rol if rol_db else 'Operador'
-            
+
+            # 6. REGISTRO EN BITÁCORA (Ahora sí, con user_db definido)
+            registrar_log("Login", "Seguridad", f"El usuario {user_db.usuario} ha iniciado sesión exitosamente.")
+
+            # 7. Redirección final
             return redirect(url_for('compras'))
+        
         else:
             error = "Usuario o contraseña incorrectos. Intenta de nuevo."
-            
+            # Opcional: Registrar intentos fallidos para detectar ataques
+            registrar_log("Intento Fallido", "Seguridad", f"Intento de acceso fallido con usuario: {usuario_form}")
+
     return render_template('login.html', error=error)
+
 
 @app.route('/areas', methods=['GET', 'POST'])
 def gestion_areas():
@@ -210,12 +244,37 @@ def logout():
 # --- RUTAS DE LA APLICACIÓN ---
 
 # --- RUTA DEL DASHBOARD (PANEL DE CONTROL CON GRÁFICAS) ---
+from datetime import datetime, timedelta
+from sqlalchemy import func
+
 @app.route('/dashboard')
 def dashboard():
     if 'usuario' not in session: 
         return redirect(url_for('login'))
     
-    # --- 1. KPIs DE INVENTARIO Y PROCESOS (Tu lógica actual) ---
+    # --- 1. LÓGICA DE ALERTAS Y NOTIFICACIONES (NUEVO) ---
+    alertas = []
+    hoy_dt = datetime.now()
+    fecha_hoy = hoy_dt.date()
+    limite_mantenimiento = fecha_hoy + timedelta(days=7)
+
+    # Alerta Metales Bajos (< 500kg)
+    metales_bajos = InventarioMetal.query.filter(InventarioMetal.cantidad_kg <= 500).all()
+    for m in metales_bajos:
+        alertas.append({
+            'nivel': 'peligro' if m.cantidad_kg < 100 else 'advertencia',
+            'mensaje': f"Stock crítico de {m.tipo_metal}: {m.cantidad_kg}kg restantes."
+        })
+
+    # Alerta Mantenimiento Maquinaria (Próximos 7 días)
+    # Nota: Asegúrate que tu modelo Maquinaria tenga 'proximo_mantenimiento'
+    maquinas_prox = Maquinaria.query.filter(Maquinaria.proximo_mantenimiento <= limite_mantenimiento).all()
+    for maq in maquinas_prox:
+        dias = (maq.proximo_mantenimiento - fecha_hoy).days
+        msg = f"Mantenimiento de {maq.nombre_equipo} " + (f"en {dias} días" if dias > 0 else "¡ES HOY!")
+        alertas.append({'nivel': 'peligro' if dias <= 1 else 'advertencia', 'mensaje': msg})
+
+    # --- 2. KPIs DE INVENTARIO Y PROCESOS (Tu lógica) ---
     metales = InventarioMetal.query.all()
     total_kilos = sum(m.cantidad_kg for m in metales if m.cantidad_kg)
     
@@ -224,28 +283,24 @@ def dashboard():
     
     procesos_activos = Proceso.query.filter_by(estado='En progreso').count()
     
-    # --- 2. KPIs DE VENTAS (NUEVO) ---
-    # Sumamos el total de dinero de todos los pedidos despachados
+    # --- 3. KPIs DE VENTAS ---
     dinero_total = db.session.query(func.sum(PedidoVenta.total)).scalar() or 0
     pedidos_pendientes = PedidoVenta.query.filter_by(estado='Pendiente').count()
 
-    # --- 3. DATOS PARA LAS GRÁFICAS ---
-    # Gráfica 1: Stock de Productos (Tu lógica actual)
+    # --- 4. DATOS PARA LAS GRÁFICAS ---
     nombres_prod = []
     cantidades_prod = []
     for inv in productos_inv:
         prod = Producto.query.get(inv.id_producto)
         if prod:
-            nombres_prod.append(f"{prod.nombre_producto} (Alm {inv.id_almacen})")
+            nombres_prod.append(f"{prod.nombre_producto}")
             cantidades_prod.append(inv.cantidad_stock)
             
-    # Gráfica 2: Distribución de Metales (Tu lógica actual)
-    tipos_metal = [f"{m.tipo_metal} (Lote {m.id_inventario_m})" for m in metales]
-    kilos_metal = [m.cantidad_kg for m in metales]
+    tipos_metal = [f"{m.tipo_metal}" for m in metales]
+    kilos_metal = [float(m.cantidad_kg) for m in metales]
 
-    # NUEVA Gráfica 3: Tendencia de Ventas (Últimos 7 días)
-    hoy = datetime.now()
-    hace_siete_dias = hoy - timedelta(days=7)
+    # Tendencia de Ventas (Últimos 7 días)
+    hace_siete_dias = hoy_dt - timedelta(days=7)
     ventas_7_dias = db.session.query(
         func.date(PedidoVenta.fecha_pedido), 
         func.sum(PedidoVenta.total)
@@ -260,14 +315,15 @@ def dashboard():
                            total_kilos=round(total_kilos, 2),
                            total_piezas=total_piezas,
                            procesos_activos=procesos_activos,
-                           dinero_total=dinero_total,
+                           dinero_total=round(dinero_total, 2),
                            pedidos_pendientes=pedidos_pendientes,
                            nombres_prod=nombres_prod,
                            cantidades_prod=cantidades_prod,
                            tipos_metal=tipos_metal,
                            kilos_metal=kilos_metal,
                            labels_ventas=labels_ventas,
-                           valores_ventas=valores_ventas)
+                           valores_ventas=valores_ventas,
+                           alertas=alertas) # <-- Pasamos las alertas aquí
 
 
 @app.route('/exportar_ventas')
@@ -510,39 +566,95 @@ def editar_producto(id):
         
     return redirect(url_for('productos'))
 
+app.config['UPLOAD_FOLDER'] = 'static/evidencias'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Límite de 16MB
+
+
+# Asegurar que la carpeta de fotos existe
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
+
+@app.context_processor
+def utilidad_alertas():
+    def obtener_conteo():
+        hoy = datetime.now().date()
+        ultimos_ids = [r[0] for r in db.session.query(func.max(Mantenimiento.id_mantenimiento)).group_by(Mantenimiento.id_maquina).all()]
+        return Mantenimiento.query.filter(Mantenimiento.fecha_proxima <= hoy, Mantenimiento.id_mantenimiento.in_(ultimos_ids)).count()
+    return dict(conteo_alertas=obtener_conteo())
+
 @app.route('/mantenimiento', methods=['GET', 'POST'])
 def mantenimiento():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
+    hoy = datetime.now().date()
+    
     if request.method == 'POST':
-        # Detectamos si estamos guardando una máquina o un mantenimiento
-        if 'guardar_maquina' in request.form:
-            nueva_maquina = Maquina(
-                nombre=request.form['nombre_maquina'],
-                modelo=request.form['modelo'],
-                estado='Operativa'
-            )
-            db.session.add(nueva_maquina)
+        accion = request.form.get('accion')
         
-        elif 'guardar_mantenimiento' in request.form:
-            fecha_dt = datetime.strptime(request.form['fecha'], '%Y-%m-%d').date()
-            nuevo_mant = Mantenimiento(
-                id_maquina=request.form['id_maquina'],
-                tipo=request.form['tipo'],
-                descripcion=request.form['descripcion'],
-                fecha=fecha_dt,
-                costo=float(request.form['costo']),
-                tecnico=request.form['tecnico']
-            )
-            db.session.add(nuevo_mant)
-        
-        db.session.commit()
-        return redirect(url_for('mantenimiento'))
+        if accion == 'registrar_mantenimiento':
+            # 1. Procesar la foto
+            file = request.files.get('foto')
+            nombre_foto_db = None
+            
+            if file and file.filename != '':
+                # Nombre único: 20260326_143005_prensa.jpg
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = secure_filename(file.filename)
+                nombre_foto_db = f"{timestamp}_{filename}"
+                # Guardar el archivo en static/evidencias
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_foto_db))
 
+            # 2. Crear el registro en la BD (foto_evidencia es String)
+            nuevo = Mantenimiento(
+                id_maquina=request.form.get('id_maquina'),
+                tipo=request.form.get('tipo'),
+                descripcion=request.form.get('descripcion'),
+                fecha=datetime.strptime(request.form.get('fecha'), '%Y-%m-%d'),
+                fecha_proxima=datetime.strptime(request.form.get('fecha_proxima'), '%Y-%m-%d') if request.form.get('fecha_proxima') else None,
+                costo=float(request.form.get('costo') or 0),
+                tecnico=request.form.get('tecnico'),
+                foto_evidencia=nombre_foto_db
+            )
+            
+            # Actualizar estado visual de la máquina
+            maquina = Maquina.query.get(nuevo.id_maquina)
+            if maquina:
+                maquina.estado = 'Operativa' if nuevo.tipo == 'Preventivo' else 'En Reparación'
+
+            db.session.add(nuevo)
+            db.session.commit()
+            flash("Registro guardado con éxito", "success")
+            return redirect(url_for('mantenimiento'))
+
+    # Consultas para la vista
     maquinas = Maquina.query.all()
     historial = Mantenimiento.query.order_by(Mantenimiento.fecha.desc()).all()
-    return render_template('mantenimiento.html', maquinas=maquinas, historial=historial)
+    # Gasto del mes para el cuadro verde
+    gasto_mes = db.session.query(db.func.sum(Mantenimiento.costo)).filter(db.func.extract('month', Mantenimiento.fecha) == hoy.month).scalar() or 0
+    
+    return render_template('mantenimiento.html', 
+                           maquinas=maquinas, 
+                           historial=historial, 
+                           gasto_mes=gasto_mes, 
+                           hoy=hoy)
+
+@app.route('/mantenimiento/atender/<int:id_maquina>')
+def atender_orden(id_maquina):
+    maquina = Maquina.query.get_or_404(id_maquina)
+    ultimo = Mantenimiento.query.filter_by(id_maquina=id_maquina).order_by(Mantenimiento.fecha.desc()).first()
+    return render_template('atender_orden.html', maquina=maquina, ultimo=ultimo, hoy=datetime.now().date())
+@app.route('/mantenimiento/alertas')
+def alertas_criticas():
+    hoy = datetime.now().date()
+    
+    # 1. Obtenemos los IDs de los mantenimientos más recientes de cada máquina
+    ultimos_ids = [r[0] for r in db.session.query(
+        func.max(Mantenimiento.id_mantenimiento)
+    ).group_by(Mantenimiento.id_maquina).all()]
+    alertas = Mantenimiento.query.filter(
+        Mantenimiento.fecha_proxima <= hoy,
+        Mantenimiento.id_mantenimiento.in_(ultimos_ids)
+    ).all()
+
+    return render_template('alertas_mantenimiento.html', alertas=alertas, hoy=hoy)
 
 # 3. RUTA DE AUTOMATIZACIÓN DE PROCESOS (Opción B)
 @app.route('/completar_proceso/<int:id>', methods=['POST'])
@@ -885,6 +997,7 @@ def compras():
         
         try:
             db.session.commit()
+            registrar_log("Compra", "Compras", f"Compra de {producto} ({cantidad} unidades) por un total de ${total:,.2f}")
         except Exception as e:
             db.session.rollback()
             return f"Error al registrar la compra: {e}"
@@ -1591,16 +1704,14 @@ def privilegios():
             db.session.add(nuevo_registro)
             
         db.session.commit()
+
+        registrar_log("Actualización", "Privilegios", f"Se cambió el rol de {usuario_modificado} a {nuevo_rol}")
         flash(f"Privilegios actualizados: {usuario_modificado} ahora es {nuevo_rol}.", "success")
         return redirect(url_for('privilegios'))
 
     # 3. GET: Traer todos los usuarios para mostrarlos en la tabla
     usuarios_db = InicioLog.query.all()
-    
-    # Creamos un diccionario rápido con los roles actuales para mostrar en el HTML
-    # Quedará algo así: {'admin': 'Administrador', 'juan': 'Operador'}
     roles_asignados = {r.nombre_usuario: r.rol for r in RolUsuario.query.all()}
-
     return render_template('privilegios.html', usuarios=usuarios_db, roles_asignados=roles_asignados)
 
 @app.route('/actualizar_bd')
@@ -1612,7 +1723,16 @@ def actualizar_bd():
         return "¡Base de datos actualizada con éxito! Ya puedes usar el módulo de embarques."
     except Exception as e:
         return f"Ocurrió un error (quizás la columna ya existe): {e}"
+    
+@app.route('/eliminar_producto/<int:id>')
+@admin_required
+def eliminar_producto(id):
+    prod = Producto.query.get(id)
+    registrar_log("Eliminar", "Inventario", f"Elimino el producto: {prod.nombre_producto}")
 
+    db.session.delete(prod)
+    db.session.commit()
+    return redirect(url_for('productos'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
