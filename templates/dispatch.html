@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block content %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+<style>
+    /* Estilos Generales y Ocultar panel de texto de rutas */
+    #mapa_dispatch { height: 600px; width: 100%; border-radius: 12px; }
+    .leaflet-routing-container { display: none !important; } /* Fuerza a ocultar las instrucciones de texto */
+    .btn-ruta { background: #4e73df; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 5px; width: 100%; }
+    .table-historial { font-size: 0.85em; }
+    .badge-completado { background: #1cc88a; color: white; padding: 3px 8px; border-radius: 15px; font-weight: bold; }
+</style>
+
+<div style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: #4e73df; font-weight: 700; margin: 0;"><i class="fas fa-route"></i> Logística y Despacho Inteligente</h2>
+        <div style="font-size: 0.9em; background: white; padding: 5px 15px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <span style="color: #e74a3b; font-weight: bold;"><i class="fas fa-map-marker-alt"></i> Almacén</span> | 
+            <span style="color: #d4af37; font-weight: bold;"><i class="fas fa-star"></i> Cliente</span> | 
+            <span style="color: #2a7fb8; font-weight: bold;"><i class="fas fa-box"></i> Pendiente</span>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 2.5fr 1fr; gap: 20px;">
+        <div>
+            <div style="background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e3e6f0;">
+                <div id="mapa_dispatch"></div>
+            </div>
+
+            <div style="margin-top: 25px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; border: 1px solid #e3e6f0;">
+                <h5 style="color: #5a5c69; font-weight: bold; margin-bottom: 15px;"><i class="fas fa-history"></i> Historial de Entregas (Recientes)</h5>
+                <table class="table table-hover table-historial" style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f8f9fc; color: #4e73df;">
+                        <tr>
+                            <th style="padding: 10px;">Venta</th>
+                            <th style="padding: 10px;">Destino / Cliente</th>
+                            <th style="padding: 10px;">Chofer</th>
+                            <th style="padding: 10px;">Fecha Salida</th>
+                            <th style="padding: 10px;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in historial %}
+                        <tr style="border-bottom: 1px solid #eaecf4;">
+                            <td style="padding: 10px;">#{{ h.id_venta }}</td>
+                            <td style="padding: 10px;">{{ h.destino }}</td>
+                            <td style="padding: 10px;">{{ h.chofer.nombre }}</td>
+                            <td style="padding: 10px;">{{ h.fecha_salida.strftime('%d/%m/%Y %H:%M') if h.fecha_salida else 'N/D' }}</td>
+                            <td style="padding: 10px;"><span class="badge-completado"><i class="fas fa-check"></i> Entregado</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px; color: #858796; font-style: italic;">
+                                No hay entregas completadas en el historial.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-top: 5px solid #1cc88a;">
+                <h5 style="color: #1cc88a; font-weight: bold; margin-bottom: 15px;">
+                    <i class="fas fa-shipping-fast"></i> En Tránsito ({{ activos|length }})
+                </h5>
+                <div style="max-height: 700px; overflow-y: auto;">
+                    {% for a in activos %}
+                    <div style="padding: 15px; border: 1px solid #eaecf4; border-radius: 8px; margin-bottom: 12px; background: #f8f9fc;">
+                        <div style="font-weight: bold; color: #4e73df; font-size: 1.1em;">Venta #{{ a.id_venta }}</div>
+                        <div style="font-size: 0.85em; color: #5a5c69; margin-top: 5px;"><strong>Destino:</strong> {{ a.destino }}</div>
+                        <div style="font-size: 0.8em; color: #858796; margin-bottom: 12px;">
+                            <strong>Vehículo:</strong> {{ a.vehiculo.placa }} <br>
+                            <strong>Chofer:</strong> {{ a.chofer.nombre }}
+                        </div>
+                        
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="imprimirOrden('{{ a.id_venta }}', '{{ a.destino }}', '{{ a.chofer.nombre }}', '{{ a.vehiculo.placa }}')" 
+                                    style="flex:1; background: #36b9cc; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">
+                                <i class="fas fa-print"></i> Ticket
+                            </button>
+                            <form action="{{ url_for('completar_envio', id=a.id_envio) }}" method="POST" style="flex:1;">
+                                <button type="submit" style="width:100%; background: #1cc88a; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">
+                                    <i class="fas fa-check"></i> Listo
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p style="text-align: center; color: #ccc; font-style: italic; margin-top: 20px;">No hay envíos activos en este momento.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // --- 1. CONFIGURACIÓN DEL MAPA ---
+        var mapa = L.map('mapa_dispatch').setView([32.5149, -117.0382], 12); // Centro en Tijuana
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© ECODATA'
+        }).addTo(mapa);
+
+        // --- 2. ICONOS PERSONALIZADOS ---
+        var iconAlmacen = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] });
+        var iconGold = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] });
+        var iconBlue = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] });
+
+        // --- 3. LÓGICA DE RUTAS Y ALMACÉN DE ORIGEN ---
+        var puntoSalida = null;
+        var routingControl = null;
+
+        window.fijarOrigen = function(lat, lng, nombre) {
+            puntoSalida = {lat: lat, lng: lng};
+            alert("📍 Origen configurado en: " + nombre + ".\nAhora puedes trazar rutas hacia tus clientes.");
+            mapa.closePopup();
+        };
+
+        window.trazarRuta = function(destLat, destLng) {
+            if (puntoSalida == null) {
+                alert("⚠️ Primero debes seleccionar un Almacén (Pin Rojo) y hacer clic en 'Salir desde aquí'.");
+                return;
+            }
+
+            if (routingControl != null) { 
+                mapa.removeControl(routingControl); 
+            }
+
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(puntoSalida.lat, puntoSalida.lng),
+                    L.latLng(destLat, destLng)
+                ],
+                lineOptions: { styles: [{ color: '#4e73df', weight: 6, opacity: 0.8 }] },
+                createMarker: function() { return null; }, // Evita agregar más pines en las puntas
+                addWaypoints: false,
+                draggableWaypoints: false,
+                show: false // Apaga el panel lateral de instrucciones de giro
+            }).on('routingerror', function(e) {
+                console.error("Error al obtener la ruta de OSRM:", e);
+                alert("⚠️ El servidor público de rutas está saturado temporalmente. Por favor, intenta de nuevo en unos segundos.");
+            }).addTo(mapa);
+            
+            mapa.closePopup();
+        };
+
+        // --- 4. DIBUJAR ALMACENES (ROJOS) ---
+        {% for a in almacenes if a.latitud %}
+            L.marker([{{ a.latitud }}, {{ a.longitud }}], {icon: iconAlmacen}).addTo(mapa)
+             .bindPopup(`
+                <div style="text-align:center; min-width: 150px;">
+                    <strong style="color:#e74a3b;">🏭 {{ a.nombre_almacen }}</strong><br>
+                    <small style="color:gray;">{{ a.ubicacion }}</small><hr style="margin: 8px 0;">
+                    <button onclick="fijarOrigen({{ a.latitud }}, {{ a.longitud }}, '{{ a.nombre_almacen }}')" style="background:#e74a3b; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; width:100%; font-weight:bold;">
+                        <i class="fas fa-crosshairs"></i> Salir desde aquí
+                    </button>
+                </div>
+             `);
+        {% endfor %}
+
+        // --- 5. DIBUJAR CLIENTES (DORADOS) ---
+        {% for c in clientes if c.latitud %}
+            L.marker([{{ c.latitud }}, {{ c.longitud }}], {icon: iconGold}).addTo(mapa)
+             .bindPopup(`
+                <div style="text-align:center; min-width: 160px;">
+                    <strong style="color:#d4af37;">⭐ {{ c.empresa }}</strong><br>
+                    <button class="btn-ruta" onclick="trazarRuta({{ c.latitud }}, {{ c.longitud }})"><i class="fas fa-route"></i> Ver Ruta</button>
+                    <form action="/dispatch" method="POST" style="margin-top:10px;">
+                        <input type="hidden" name="accion" value="crear_envio">
+                        <input type="hidden" name="latitud" value="{{ c.latitud }}">
+                        <input type="hidden" name="longitud" value="{{ c.longitud }}">
+                        <input type="hidden" name="destino" value="{{ c.empresa }}">
+                        <input type="number" name="id_venta" placeholder="ID Venta" required style="width:100%; margin-bottom:8px; padding: 4px; border:1px solid #ccc; border-radius:4px;">
+                        <button type="submit" style="background:#4e73df; color:white; border:none; width:100%; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">Crear Envío</button>
+                    </form>
+                </div>
+             `);
+        {% endfor %}
+
+        // --- 6. DIBUJAR ENVÍOS PENDIENTES (AZULES) ---
+        {% for e in pendientes %}
+            L.marker([{{ e.latitud }}, {{ e.longitud }}], {icon: iconBlue}).addTo(mapa)
+             .bindPopup(`
+                <div style="min-width:180px;">
+                    <h6 style="color:#4e73df; margin:0; font-weight:bold;">Venta #{{ e.id_venta }}</h6>
+                    <small style="color:gray;">{{ e.destino }}</small>
+                    <button class="btn-ruta" onclick="trazarRuta({{ e.latitud }}, {{ e.longitud }})" style="margin-bottom:10px;"><i class="fas fa-route"></i> Ver Ruta</button>
+                    <hr style="margin: 8px 0;">
+                    <form action="/dispatch" method="POST">
+                        <input type="hidden" name="accion" value="asignar_envio">
+                        <input type="hidden" name="id_envio" value="{{ e.id_envio }}">
+                        <select name="id_chofer" required style="width:100%; margin-bottom:5px; padding: 4px;">
+                            <option value="">-- Asignar Chofer --</option>
+                            {% for c in choferes %}<option value="{{ c.id_chofer }}">{{ c.nombre }}</option>{% endfor %}
+                        </select>
+                        <select name="id_vehiculo" required style="width:100%; margin-bottom:10px; padding: 4px;">
+                            <option value="">-- Asignar Vehículo --</option>
+                            {% for v in vehiculos %}<option value="{{ v.id_vehiculo }}">{{ v.placa }}</option>{% endfor %}
+                        </select>
+                        <button type="submit" style="background:#1cc88a; color:white; border:none; width:100%; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">Despachar Pedido</button>
+                    </form>
+                </div>
+             `);
+        {% endfor %}
+
+        // --- 7. CLIC EN EL MAPA: VINCULAR UBICACIÓN (ALMACÉN O CLIENTE) ---
+        mapa.on('click', function(e) {
+            var lat = e.latlng.lat; var lng = e.latlng.lng;
+            var html = `
+                <div style="min-width:200px;">
+                    <h6 style="margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px; color:#5a5c69; font-weight:bold;">Guardar Ubicación</h6>
+                    
+                    <form action="/dispatch" method="POST" style="margin-bottom: 10px; padding: 8px; background: #fff0f0; border-radius: 6px; border: 1px dashed #e74a3b;">
+                        <input type="hidden" name="accion" value="guardar_ubicacion_almacen">
+                        <input type="hidden" name="lat" value="${lat}"> <input type="hidden" name="lng" value="${lng}">
+                        <select name="id_almacen" required style="width:100%; margin-bottom:8px; padding:4px;">
+                            <option value="">-- Seleccionar Almacén --</option>
+                            {% for a in almacenes %}<option value="{{ a.id_almacen }}">{{ a.nombre_almacen }}</option>{% endfor %}
+                        </select>
+                        <button type="submit" style="background:#e74a3b; color:white; border:none; width:100%; padding:6px; border-radius:4px; font-size: 12px; font-weight:bold; cursor:pointer;">📍 Fijar Almacén</button>
+                    </form>
+
+                    <form action="/dispatch" method="POST" style="padding: 8px; background: #fff8e1; border-radius: 6px; border: 1px dashed #f6c23e;">
+                        <input type="hidden" name="accion" value="guardar_ubicacion_cliente">
+                        <input type="hidden" name="lat" value="${lat}"> <input type="hidden" name="lng" value="${lng}">
+                        <select name="id_cliente" required style="width:100%; margin-bottom:8px; padding:4px;">
+                            <option value="">-- Seleccionar Cliente --</option>
+                            {% for c in clientes %}<option value="{{ c.id_cliente }}">{{ c.empresa }}</option>{% endfor %}
+                        </select>
+                        <button type="submit" style="background:#f6c23e; color:white; border:none; width:100%; padding:6px; border-radius:4px; font-size: 12px; font-weight:bold; cursor:pointer;">⭐ Fijar Cliente</button>
+                    </form>
+                </div>`;
+            L.popup().setLatLng(e.latlng).setContent(html).openOn(mapa);
+        });
+    });
+
+    // --- 8. FUNCIÓN DE IMPRESIÓN (AHORA CON FECHA Y HORA) ---
+    function imprimirOrden(venta, destino, chofer, placa) {
+        var fechaActual = new Date().toLocaleString('es-MX', { 
+            year: 'numeric', month: 'long', day: 'numeric', 
+            hour: '2-digit', minute: '2-digit', second: '2-digit' 
+        });
+
+        var ventana = window.open('', 'PRINT', 'height=600,width=800');
+        ventana.document.write('<html><head><title>Ticket ECODATA - Venta #' + venta + '</title></head><body style="padding:40px; font-family:sans-serif; line-height:1.6;">');
+        
+        // Encabezado
+        ventana.document.write('<div style="text-align:center;">');
+        ventana.document.write('<h2 style="margin-bottom: 5px; color: #4e73df;">ECODATA LOGÍSTICA</h2>');
+        ventana.document.write('<p style="margin-top: 0; font-size: 1.2em; font-weight: bold;">ORDEN DE DESPACHO</p>');
+        ventana.document.write('<hr style="border: 1px solid #ccc; margin-bottom: 20px;"></div>');
+        
+        // Detalles
+        ventana.document.write('<h3 style="color: #5a5c69; border-bottom: 1px solid #eee; padding-bottom: 5px;">Detalles de la Entrega</h3>');
+        ventana.document.write('<p><strong>No. Venta:</strong> #' + venta + '</p>');
+        ventana.document.write('<p><strong>Fecha y Hora de Salida:</strong> ' + fechaActual + '</p>');
+        ventana.document.write('<p><strong>Cliente/Destino:</strong> ' + destino + '</p>');
+        ventana.document.write('<p><strong>Chofer Responsable:</strong> ' + chofer + '</p>');
+        ventana.document.write('<p><strong>Vehículo (Placas):</strong> ' + placa + '</p>');
+        
+        // Firmas
+        ventana.document.write('<br><br><br><br><br><br>');
+        ventana.document.write('<div style="display:flex; justify-content:space-between; text-align:center; padding: 0 40px;">');
+        ventana.document.write('<div style="border-top:1px solid #000; width:250px; padding-top:10px;"><strong>Firma de Almacén</strong><br><small>Autoriza Salida</small></div>');
+        ventana.document.write('<div style="border-top:1px solid #000; width:250px; padding-top:10px;"><strong>Firma del Cliente</strong><br><small>Recibe de Conformidad</small></div>');
+        ventana.document.write('</div>');
+        
+        ventana.document.write('</body></html>');
+        ventana.document.close();
+        
+        setTimeout(function() {
+            ventana.print();
+        }, 250);
+    }
+</script>
+
+{% endblock %}

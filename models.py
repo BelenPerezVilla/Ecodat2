@@ -38,6 +38,9 @@ class Almacen(db.Model):
     id_almacen = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nombre_almacen = db.Column(db.String(100), nullable=False)
     ubicacion = db.Column(db.String(255))
+    latitud = db.Column(db.Float)
+    longitud = db.Column(db.Float)
+
     # Relaciones con los inventarios
     inventario_metal = db.relationship('InventarioMetal', backref='almacen', lazy=True)
     inventario_producto = db.relationship('InventarioProducto', backref='almacen', lazy=True)
@@ -105,6 +108,8 @@ class Cliente(db.Model):
     nombre_contacto = db.Column(db.String(150), nullable=False)
     empresa = db.Column(db.String(150), nullable=False) # Ej. "Ferretería El Tornillo"
     telefono = db.Column(db.String(50), nullable=True)
+    latitud = db.Column(db.Float, nullable=True)  # Para el mapa
+    longitud = db.Column(db.Float, nullable=True) # Para el mapa
 
 class Venta(db.Model):
     __tablename__ = 'venta'
@@ -177,14 +182,19 @@ class Chofer(db.Model):
 class Envio(db.Model):
     __tablename__ = 'envios'
     id_envio = db.Column(db.Integer, primary_key=True)
-    id_venta = db.Column(db.Integer, db.ForeignKey('venta.id_venta')) # Vinculado a la venta
+    id_venta = db.Column(db.Integer, db.ForeignKey('venta.id_venta')) 
     id_vehiculo = db.Column(db.Integer, db.ForeignKey('vehiculos.id_vehiculo'))
     id_chofer = db.Column(db.Integer, db.ForeignKey('choferes.id_chofer'))
     fecha_salida = db.Column(db.DateTime, default=datetime.now)
     destino = db.Column(db.String(200))
-    estado_entrega = db.Column(db.String(20), default='En Tránsito') # En Tránsito, Entregado, Cancelado
+    
+    # --- NUEVOS CAMPOS PARA EL MAPA ---
+    latitud = db.Column(db.Float, nullable=True)  
+    longitud = db.Column(db.Float, nullable=True) 
+    
+    # --- CAMBIO SUGERIDO: Empezar en Pendiente ---
+    estado_entrega = db.Column(db.String(20), default='Pendiente') 
 
-    # Relaciones para consultas fáciles
     venta = db.relationship('Venta', backref='envio')
     vehiculo = db.relationship('Vehiculo', backref='envios')
     chofer = db.relationship('Chofer', backref='envios')

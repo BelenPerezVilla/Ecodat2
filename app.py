@@ -154,6 +154,80 @@ def login():
 
     return render_template('login.html', error=error)
 
+@app.route('/dispatch', methods=['GET', 'POST'])
+def dispatch_mapa():
+    if request.method == 'POST':
+        accion = request.form.get('accion')
+        
+        # ACCIÓN 1: Asignar chofer y vehículo a un envío pendiente
+        if accion == 'asignar_envio':
+            envio = Envio.query.get(request.form.get('id_envio'))
+            if envio:
+                envio.id_vehiculo = request.form.get('id_vehiculo')
+                envio.id_chofer = request.form.get('id_chofer')
+                envio.estado_entrega = 'En Tránsito'
+                
+                vehiculo = Vehiculo.query.get(envio.id_vehiculo)
+                if vehiculo: vehiculo.estado = 'En Ruta'
+                db.session.commit()
+        
+        # ACCIÓN 2: Crear un nuevo envío desde el mapa
+        elif accion == 'crear_envio':
+            nuevo = Envio(
+                id_venta=request.form.get('id_venta'),
+                destino=request.form.get('destino'),
+                latitud=request.form.get('latitud'),
+                longitud=request.form.get('longitud'),
+                estado_entrega='Pendiente'
+            )
+            db.session.add(nuevo)
+            db.session.commit()
+
+        # ACCIÓN 3: Guardar ubicación en la ficha del Cliente
+        elif accion == 'guardar_ubicacion_cliente':
+            cliente = Cliente.query.get(request.form.get('id_cliente'))
+            if cliente:
+                cliente.latitud = request.form.get('lat')
+                cliente.longitud = request.form.get('lng')
+                db.session.commit()
+        if accion == 'guardar_ubicacion_almacen':
+            almacen = Almacen.query.get(request.form.get('id_almacen'))
+            if almacen:
+                almacen.latitud = request.form.get('lat')
+                almacen.longitud = request.form.get('lng')
+                db.session.commit()
+                
+        return redirect(url_for('dispatch_mapa'))
+
+    # Datos para la vista
+    almacenes = Almacen.query.all()
+    clientes = Cliente.query.all()
+    pendientes = Envio.query.filter_by(estado_entrega='Pendiente').all()
+    activos = Envio.query.filter_by(estado_entrega='En Tránsito').all()
+    vehiculos = Vehiculo.query.filter_by(estado='Disponible').all()
+    choferes = Chofer.query.all()
+    historial = Envio.query.filter_by(estado_entrega='Entregado').order_by(Envio.id_envio.desc()).limit(10).all()
+    
+    return render_template('dispatch.html', 
+                           clientes=clientes, 
+                           pendientes=pendientes, 
+                           activos=activos, 
+                           vehiculos=vehiculos, 
+                           choferes=choferes,
+                           almacenes=almacenes,
+                           historial=historial)
+
+
+@app.route('/completar_envio/<int:id>', methods=['POST'])
+def completar_envio(id):
+    envio = Envio.query.get(id)
+    if envio:
+        envio.estado_entrega = 'Entregado'
+        # Liberar el vehículo
+        vehiculo = Vehiculo.query.get(envio.id_vehiculo)
+        if vehiculo: vehiculo.estado = 'Disponible'
+        db.session.commit()
+    return redirect(url_for('dispatch_mapa'))
 
 @app.route('/areas', methods=['GET', 'POST'])
 def gestion_areas():
