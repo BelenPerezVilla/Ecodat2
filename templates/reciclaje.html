@@ -1,113 +1,345 @@
 {% extends "base.html" %}
+
 {% block title %}Proceso de Reciclaje - EcoData{% endblock %}
 
-{% block content %}
+{% block extra_head %}
 <style>
-    :root {
-        --dark-bg: #1a202c;
-        --orange-fire: #dd6b20;
-        --success: #38a169;
-        --bg-light: #f7fafc;
+    /*
+        Propósito:
+        Estilos específicos del módulo de reciclaje.
+    */
+    .recycle-lot {
+        font-weight: 800;
+        color: #c05621;
     }
-    .card-panel { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 30px; overflow: hidden; }
-    .card-header-orange { background: var(--dark-bg); color: white; padding: 18px 25px; border-bottom: 4px solid var(--orange-fire); display: flex; align-items: center; gap: 12px; }
-    .form-input { width: 100%; padding: 12px; border: 2px solid #edf2f7; border-radius: 8px; background: #f8fafc; }
-    .form-input:focus { border-color: var(--orange-fire); outline: none; }
-    .btn-fire { background: var(--orange-fire); color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .btn-fire:hover { background: #c05621; }
-    .table-custom { width: 100%; border-collapse: collapse; }
-    .table-custom th { text-align: left; padding: 15px; border-bottom: 2px solid #edf2f7; color: #718096; text-transform: uppercase; font-size: 0.8rem; }
-    .table-custom td { padding: 15px; border-bottom: 1px solid #edf2f7; }
-    .badge-process { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; background: #feebc8; color: #c05621; }
-    .badge-done { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; background: #c6f6d5; color: #22543d; }
-</style>
 
-<div style="padding: 30px; background: var(--bg-light); min-height: 100vh;">
-    
-    <div class="card-panel">
-        <div class="card-header-orange">
-            <i class="fas fa-fire-alt fa-lg" style="color: var(--orange-fire);"></i>
-            <h3 style="margin:0; font-size: 1.2rem;">Iniciar Lote de Fundición / Reciclaje</h3>
-        </div>
-        <form action="/reciclaje" method="POST" style="padding: 25px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: end;">
-            <div>
-                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Código de Lote</label>
-                <input type="text" name="lote" class="form-input" placeholder="Ej: LOTE-AL-001" required>
-            </div>
-            <div>
-                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Tipo de Metal</label>
-                <select name="metal_origen" class="form-input" required>
-                    <option value="Aluminio">Aluminio</option>
-                    <option value="Cobre">Cobre</option>
-                    <option value="Bronce">Bronce</option>
-                    <option value="Acero">Acero / Fierro</option>
-                </select>
-            </div>
-            <div>
-                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Peso Entrada (Chatarra KG)</label>
-                <input type="number" step="0.1" name="peso_entrada" class="form-input" placeholder="Ej: 500.5" required>
-            </div>
-            <div>
-                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Máquina / Horno</label>
-                <select name="id_maquina" class="form-input" required>
-                    {% for m in maquinas %}
-                    <option value="{{ m.id_maquina }}">{{ m.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="btn-fire"><i class="fas fa-play"></i> Iniciar Proceso</button>
-        </form>
+    .recycle-meta {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-top: 4px;
+    }
+
+    .recycle-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .recycle-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .recycle-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .recycle-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .yield-box {
+        display: grid;
+        gap: 4px;
+    }
+
+    .yield-success {
+        color: var(--success);
+        font-weight: 800;
+    }
+
+    .yield-loss {
+        color: var(--danger);
+        font-size: 0.82rem;
+    }
+
+    .yield-pending {
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+
+    .recycle-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+
+    .recycle-inline-form {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .recycle-inline-form .input {
+        min-width: 130px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Proceso de reciclaje y fundición</h1>
+        <p class="page-subtitle">
+            Controla lotes de reciclaje, peso de entrada, rendimiento final y máquina utilizada.
+        </p>
     </div>
 
-    <div class="card-panel">
-        <div style="padding: 20px 25px; border-bottom: 1px solid #edf2f7;">
-            <h4 style="margin:0; color: #2d3748;"><i class="fas fa-cogs"></i> Monitoreo de Lotes Activos</h4>
+    <a href="{{ url_for('maquinaria') }}" class="btn btn-secondary">
+        <i class="fas fa-screwdriver-wrench"></i>
+        Ver maquinaria
+    </a>
+</div>
+
+{% set procesos_completados = procesos | selectattr('estado', 'equalto', 'Completado') | list %}
+{% set procesos_activos = procesos | rejectattr('estado', 'equalto', 'Completado') | list %}
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Lotes registrados</div>
+        <div class="kpi-value">{{ procesos|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Lotes activos</div>
+        <div class="kpi-value">{{ procesos_activos|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Lotes completados</div>
+        <div class="kpi-value">{{ procesos_completados|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Máquinas disponibles</div>
+        <div class="kpi-value">{{ maquinas|length }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-fire"></i> Estado del reciclaje</h3>
         </div>
-        <table class="table-custom">
-            <thead>
-                <tr>
-                    <th>Lote y Metal</th>
-                    <th>Máquina</th>
-                    <th>Entrada (KG)</th>
-                    <th>Rendimiento</th>
-                    <th>Estado / Acción</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in procesos %}
-                <tr>
-                    <td>
-                        <strong style="color: var(--orange-fire);">{{ p.lote }}</strong><br>
-                        <small style="color: #718096;">{{ p.metal_origen }}</small>
-                    </td>
-                    <td><i class="fas fa-industry" style="color:#a0aec0;"></i> {{ p.maquina.nombre }}</td>
-                    <td><strong>{{ p.peso_entrada_kg }} kg</strong></td>
-                    
-                    <td>
-                        {% if p.estado == 'Completado' %}
-                            <div style="color: var(--success); font-weight: bold;">Salida: {{ p.peso_salida_kg }} kg</div>
-                            <div style="color: #e53e3e; font-size: 0.8rem;">Merma: {{ p.merma_kg }} kg 
-                                ({{ ((p.peso_salida_kg / p.peso_entrada_kg) * 100) | round(1) }}% Eficiencia)
-                            </div>
-                        {% else %}
-                            <span style="color: #a0aec0; font-size: 0.85rem;">Esperando fundición...</span>
-                        {% endif %}
-                    </td>
-                    
-                    <td>
-                        {% if p.estado != 'Completado' %}
-                        <form action="{{ url_for('finalizar_reciclaje', id_proceso=p.id_proceso) }}" method="POST" style="display: flex; gap: 10px;">
-                            <input type="number" step="0.1" name="peso_salida" class="form-input" style="padding: 6px; width: 100px;" placeholder="KG Salida" required>
-                            <button type="submit" class="btn-fire" style="padding: 6px 12px; background: var(--success);"><i class="fas fa-check"></i></button>
-                        </form>
-                        {% else %}
-                            <span class="badge-done"><i class="fas fa-check-double"></i> COMPLETADO</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+        <div class="card-body">
+            <div class="recycle-summary">
+                <div class="recycle-summary-item">
+                    <div>
+                        <strong>Lotes en proceso</strong>
+                        <span>Corridas que siguen pendientes de cierre</span>
+                    </div>
+                    <span class="badge badge-warning">{{ procesos_activos|length }}</span>
+                </div>
+
+                <div class="recycle-summary-item">
+                    <div>
+                        <strong>Lotes completados</strong>
+                        <span>Corridas con salida registrada y merma calculada</span>
+                    </div>
+                    <span class="badge badge-success">{{ procesos_completados|length }}</span>
+                </div>
+
+                <div class="recycle-summary-item">
+                    <div>
+                        <strong>Máquinas asignables</strong>
+                        <span>Equipos disponibles para iniciar proceso</span>
+                    </div>
+                    <span class="badge badge-info">{{ maquinas|length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones operativas</h3>
+        </div>
+
+        <div class="card-body">
+            {% if maquinas %}
+                <div class="recycle-empty-note">
+                    Usa códigos de lote claros y captura el peso de salida en cuanto finalice
+                    la fundición para calcular merma y eficiencia del proceso.
+                </div>
+            {% else %}
+                <div class="recycle-empty-note">
+                    Registra maquinaria antes de iniciar lotes de reciclaje, para poder
+                    asociar correctamente cada corrida a su equipo de trabajo.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-play-circle"></i> Iniciar lote de fundición / reciclaje</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="{{ url_for('reciclaje') }}" method="POST">
+            <div class="form-grid cols-4">
+                <div class="field">
+                    <label for="lote">Código de lote</label>
+                    <input
+                        id="lote"
+                        type="text"
+                        name="lote"
+                        class="input"
+                        placeholder="Ej. LOTE-AL-001"
+                        required
+                    />
+                </div>
+
+                <div class="field">
+                    <label for="metal_origen">Tipo de metal</label>
+                    <select id="metal_origen" name="metal_origen" class="select" required>
+                        <option value="Aluminio">Aluminio</option>
+                        <option value="Cobre">Cobre</option>
+                        <option value="Bronce">Bronce</option>
+                        <option value="Acero">Acero / Fierro</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="peso_entrada">Peso entrada (chatarra KG)</label>
+                    <input
+                        id="peso_entrada"
+                        type="number"
+                        step="0.1"
+                        name="peso_entrada"
+                        class="input"
+                        placeholder="Ej. 500.5"
+                        required
+                    />
+                </div>
+
+                <div class="field">
+                    <label for="id_maquina">Máquina / horno</label>
+                    <select id="id_maquina" name="id_maquina" class="select" required>
+                        {% for m in maquinas %}
+                            <option value="{{ m.id_maquina }}">{{ m.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-play"></i>
+                    Iniciar proceso
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-cogs"></i> Monitoreo de lotes activos</h3>
+        <span class="badge badge-neutral">{{ procesos|length }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+        <div class="table-shell">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Lote y metal</th>
+                        <th>Máquina</th>
+                        <th>Entrada (KG)</th>
+                        <th>Rendimiento</th>
+                        <th>Estado / acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in procesos %}
+                        <tr>
+                            <td>
+                                <div class="recycle-lot">{{ p.lote }}</div>
+                                <div class="recycle-meta">{{ p.metal_origen }}</div>
+                            </td>
+
+                            <td>
+                                {% if p.maquina %}
+                                    <strong>{{ p.maquina.nombre }}</strong>
+                                {% else %}
+                                    <span style="color:#64748b;">Sin máquina</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <strong>{{ p.peso_entrada_kg }} kg</strong>
+                            </td>
+
+                            <td>
+                                {% if p.estado == 'Completado' %}
+                                    <div class="yield-box">
+                                        <div class="yield-success">
+                                            Salida: {{ p.peso_salida_kg }} kg
+                                        </div>
+                                        <div class="yield-loss">
+                                            Merma: {{ p.merma_kg }} kg
+                                            ({{ ((p.peso_salida_kg / p.peso_entrada_kg) * 100) | round(1) }}% eficiencia)
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="yield-pending">Esperando fundición...</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if p.estado != 'Completado' %}
+                                    <form
+                                        action="{{ url_for('finalizar_reciclaje', id_proceso=p.id_proceso) }}"
+                                        method="POST"
+                                        class="recycle-inline-form"
+                                    >
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            name="peso_salida"
+                                            class="input"
+                                            placeholder="KG salida"
+                                            required
+                                        />
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            <i class="fas fa-check"></i>
+                                            Finalizar
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="badge badge-success">Completado</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <i class="fas fa-fire-flame-curved"></i>
+                                    No hay lotes de reciclaje registrados todavía.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -2,97 +2,255 @@
 
 {% block title %}Control de Báscula y Embarques - EcoData{% endblock %}
 
-{% block content %}
+{% block extra_head %}
 <style>
-    :root {
-        --primary-dark: #1a202c;
-        --accent-blue: #3182ce;
-        --success-green: #38a169;
-        --bg-light: #f7fafc;
+    /*
+        Propósito:
+        Estilos específicos del módulo de embarques.
+    */
+    .weigh-preview {
+        width: 100%;
+        border: 1px solid #dbe2ea;
+        background: #f8fafc;
+        color: var(--brand-dark);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font-size: 1rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
     }
-    .card-panel { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; overflow: hidden; }
-    .card-header-dark { background: var(--primary-dark); color: white; padding: 18px 25px; display: flex; align-items: center; gap: 12px; }
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 25px; }
-    .form-group label { display: block; font-weight: 700; margin-bottom: 8px; color: #4a5568; font-size: 0.85rem; text-transform: uppercase; }
-    .form-input { width: 100%; padding: 10px; border: 2px solid #edf2f7; border-radius: 8px; background-color: #fff; }
-    .btn-submit { background: var(--accent-blue); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 0 25px 25px auto; display: block; }
-    .table-custom { width: 100%; border-collapse: collapse; }
-    .table-custom th { text-align: left; padding: 15px; border-bottom: 2px solid #edf2f7; color: #718096; font-size: 0.8rem; text-transform: uppercase; }
-    .table-custom td { padding: 15px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
-    
-    .badge-entrada { background: #c6f6d5; color: #22543d; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
-    .badge-salida { background: #ebf8ff; color: #2b6cb0; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
-    .peso-neto { font-weight: bold; color: var(--success-green); font-size: 1.1rem; }
-    .material-badge { background: #edf2f7; color: #4a5568; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; border: 1px solid #e2e8f0; }
-    
-    /* Pequeño ajuste visual para los select */
-    select.form-input { appearance: auto; cursor: pointer; }
-</style>
 
-<div style="padding: 30px; background: var(--bg-light); min-height: 100vh;">
-    
-    <div class="card-panel">
-        <div class="card-header-dark">
-            <i class="fas fa-truck-moving"></i>
-            <h3 style="margin:0; font-size: 1.2rem;">Registro de Báscula (Inbound / Outbound)</h3>
+    .embarque-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .embarque-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .embarque-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .embarque-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .embarque-folio {
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .embarque-meta {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-top: 4px;
+    }
+
+    .embarque-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+
+    .material-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #eef2f7;
+        color: #475569;
+        font-size: 0.8rem;
+        font-weight: 700;
+        border: 1px solid #e2e8f0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Control de báscula y embarques</h1>
+        <p class="page-subtitle">
+            Registra entradas, salidas, origen o destino, material y peso neto del movimiento.
+        </p>
+    </div>
+
+    <a href="{{ url_for('transporte') }}" class="btn btn-secondary">
+        <i class="fas fa-truck-fast"></i>
+        Ir a transporte
+    </a>
+</div>
+
+{% set entradas = embarques | selectattr('tipo_movimiento', 'equalto', 'Entrada') | list %}
+{% set salidas = embarques | selectattr('tipo_movimiento', 'equalto', 'Salida') | list %}
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Movimientos</div>
+        <div class="kpi-value">{{ embarques|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Entradas</div>
+        <div class="kpi-value">{{ entradas|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Salidas</div>
+        <div class="kpi-value">{{ salidas|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Tipos de metal</div>
+        <div class="kpi-value">{{ metales|length }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-scale-balanced"></i> Estado del flujo</h3>
         </div>
-        <form action="/embarques" method="POST">
-            <div class="form-grid">
-                
-                <div class="form-group">
-                    <label>Tipo de Movimiento</label>
-                    <select name="tipo_movimiento" class="form-input" required>
-                        <option value="Entrada">⬇️ Entrada (Recepción de Chatarra)</option>
-                        <option value="Salida">⬆️ Salida (Venta a Cliente)</option>
+
+        <div class="card-body">
+            <div class="embarque-summary">
+                <div class="embarque-summary-item">
+                    <div>
+                        <strong>Recepciones</strong>
+                        <span>Entradas de material o chatarra</span>
+                    </div>
+                    <span class="badge badge-success">{{ entradas|length }}</span>
+                </div>
+
+                <div class="embarque-summary-item">
+                    <div>
+                        <strong>Despachos</strong>
+                        <span>Salidas vinculadas a cliente</span>
+                    </div>
+                    <span class="badge badge-info">{{ salidas|length }}</span>
+                </div>
+
+                <div class="embarque-summary-item">
+                    <div>
+                        <strong>Vehículos capturados</strong>
+                        <span>Unidades disponibles en catálogo</span>
+                    </div>
+                    <span class="badge badge-neutral">{{ vehiculos|length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones operativas</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="embarque-empty-note">
+                Este módulo registra el movimiento físico en báscula. La ruta guarda:
+                <strong>tipo_movimiento</strong>, <strong>placas</strong>, <strong>chofer</strong>,
+                <strong>origen_destino</strong>, <strong>tipo_metal</strong>,
+                <strong>peso_bruto</strong> y <strong>peso_tara</strong>.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-weight-hanging"></i> Registro de báscula</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="{{ url_for('embarques') }}" method="POST">
+            <div class="form-grid cols-4">
+                <div class="field">
+                    <label for="tipo_movimiento">Tipo de movimiento</label>
+                    <select id="tipo_movimiento" name="tipo_movimiento" class="select" required>
+                        <option value="Entrada">Entrada</option>
+                        <option value="Salida">Salida</option>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label>Vehículo Registrado</label>
-                    <select name="placas" class="form-input" required>
-                        <option value="" disabled selected>Seleccione un vehículo...</option>
+
+                <div class="field">
+                    <label for="placas">Vehículo registrado</label>
+                    <select id="placas" name="placas" class="select" required>
+                        <option value="" disabled selected>Selecciona un vehículo...</option>
                         {% for v in vehiculos %}
-                            <option value="{{ v.placas }}">{{ v.placas }} - {{ v.marca }} {{ v.modelo }}</option>
+                            <option value="{{ v.placa }}">
+                                {{ v.placa }} · {{ v.modelo }} · {{ v.capacidad_kg or 0 }} kg
+                            </option>
                         {% else %}
                             <option value="" disabled>No hay vehículos registrados</option>
                         {% endfor %}
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label>Chofer</label>
-                    <select name="chofer" class="form-input" required>
-                        <option value="" disabled selected>Seleccione un chofer...</option>
+                <div class="field">
+                    <label for="chofer">Chofer</label>
+                    <select id="chofer" name="chofer" class="select" required>
+                        <option value="" disabled selected>Selecciona un chofer...</option>
                         {% for c in choferes %}
-                            <option value="{{ c.nombre }}">{{ c.nombre }} (Lic: {{ c.licencia }})</option>
+                            <option value="{{ c.nombre }}">
+                                {{ c.nombre }}{% if c.licencia %} · Lic: {{ c.licencia }}{% endif %}
+                            </option>
                         {% else %}
-                             <option value="" disabled>No hay choferes registrados</option>
+                            <option value="" disabled>No hay choferes registrados</option>
                         {% endfor %}
-                     </select>
+                    </select>
                 </div>
-                
-                <div class="form-group">
-                    <label>Origen / Destino</label>
-                    <select name="origen_destino" class="form-input" required>
-                        <option value="" disabled selected>Selecciona Origen / Destino...</option>
-                        
-                        <optgroup label="🏭 Proveedores (Para Entradas)">
+
+                <div class="field">
+                    <label for="origen_destino">Origen / destino</label>
+                    <select id="origen_destino" name="origen_destino" class="select" required>
+                        <option value="" disabled selected>Selecciona origen o destino...</option>
+
+                        <optgroup label="Proveedores">
                             {% for p in proveedores %}
                                 <option value="{{ p.nombre }}">{{ p.nombre }}</option>
                             {% endfor %}
                         </optgroup>
-                        
-                        <optgroup label="🏢 Clientes (Para Salidas)">
+
+                        <optgroup label="Clientes">
                             {% for c in clientes %}
-                                <option value="{{ c.empresa }}">{{ c.empresa }} ({{ c.nombre_contacto }})</option>
+                                <option value="{{ c.empresa }}">{{ c.empresa }}{% if c.nombre_contacto %} ({{ c.nombre_contacto }}){% endif %}</option>
                             {% endfor %}
                         </optgroup>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label>Tipo de Material / Metal</label>
-                    <input list="lista-metales" name="tipo_metal" class="form-input" placeholder="Selecciona o escribe uno nuevo..." autocomplete="off" required>
+            </div>
+
+            <div class="form-grid cols-4" style="margin-top: 16px;">
+                <div class="field">
+                    <label for="tipo_metal">Tipo de material / metal</label>
+                    <input
+                        id="tipo_metal"
+                        list="lista-metales"
+                        name="tipo_metal"
+                        class="input"
+                        placeholder="Selecciona o escribe uno nuevo..."
+                        autocomplete="off"
+                        required
+                    />
                     <datalist id="lista-metales">
                         {% for metal in metales %}
                             <option value="{{ metal }}"></option>
@@ -100,75 +258,157 @@
                     </datalist>
                 </div>
 
-                <div class="form-group">
-                    <label>Peso Bruto (Camión Lleno) - KG</label>
-                    <input type="number" step="0.1" name="peso_bruto" class="form-input" placeholder="0.00" required>
+                <div class="field">
+                    <label for="peso_bruto">Peso bruto (camión lleno) KG</label>
+                    <input
+                        id="peso_bruto"
+                        type="number"
+                        step="0.1"
+                        name="peso_bruto"
+                        class="input"
+                        placeholder="0.00"
+                        required
+                    />
                 </div>
-                
-                <div class="form-group">
-                    <label>Peso Tara (Camión Vacío) - KG</label>
-                    <input type="number" step="0.1" name="peso_tara" class="form-input" placeholder="0.00" required>
+
+                <div class="field">
+                    <label for="peso_tara">Peso tara (camión vacío) KG</label>
+                    <input
+                        id="peso_tara"
+                        type="number"
+                        step="0.1"
+                        name="peso_tara"
+                        class="input"
+                        placeholder="0.00"
+                        required
+                    />
+                </div>
+
+                <div class="field">
+                    <label>Peso neto estimado</label>
+                    <div id="peso_neto_preview" class="weigh-preview">0.00 kg</div>
                 </div>
             </div>
-            
-            <button type="submit" class="btn-submit"><i class="fas fa-weight"></i> Registrar Pesaje</button>
+
+            <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-weight-hanging"></i>
+                    Registrar pesaje
+                </button>
+            </div>
         </form>
     </div>
+</div>
 
-    <div class="card-panel">
-        <div style="padding: 20px 25px; border-bottom: 1px solid #edf2f7;">
-            <h4 style="margin:0; color: var(--primary-dark);"><i class="fas fa-clipboard-list"></i> Historial de Movimientos</h4>
-        </div>
-        <div style="overflow-x: auto;">
-            <table class="table-custom">
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-clock-rotate-left"></i> Historial de movimientos</h3>
+        <span class="badge badge-neutral">{{ embarques|length }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+        <div class="table-shell">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Folio</th>
                         <th>Fecha</th>
                         <th>Tipo</th>
-                        <th>Vehículo / Chofer</th>
-                        <th>Origen / Destino</th>
+                        <th>Vehículo / chofer</th>
+                        <th>Origen / destino</th>
                         <th>Material</th>
-                        <th>Bruto / Tara</th>
-                        <th>Peso Neto</th>
+                        <th>Bruto / tara</th>
+                        <th>Peso neto</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for e in embarques %}
-                    <tr>
-                        <td><strong>#EMB-{{ e.id_embarque }}</strong></td>
-                        <td>{{ e.fecha_registro.strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td>
-                            <span class="{% if e.tipo_movimiento == 'Entrada' %}badge-entrada{% else %}badge-salida{% endif %}">
-                                <i class="fas {% if e.tipo_movimiento == 'Entrada' %}fa-arrow-down{% else %}fa-arrow-up{% endif %}"></i> 
-                                {{ e.tipo_movimiento | upper }}
-                            </span>
-                        </td>
-                        <td>
-                            <div style="font-weight: bold;">{{ e.placas }}</div>
-                            <div style="font-size: 0.8rem; color: #718096;"><i class="fas fa-user"></i> {{ e.chofer }}</div>
-                        </td>
-                        <td>{{ e.origen_destino }}</td>
-                        
-                        <td><span class="material-badge">{{ e.tipo_metal }}</span></td>
-                        
-                        <td style="font-size: 0.85rem; color: #718096;">
-                            B: {{ e.peso_bruto_kg }} kg<br>
-                            T: {{ e.peso_tara_kg }} kg
-                        </td>
-                        <td class="peso-neto">{{ e.peso_neto_kg }} kg</td>
-                    </tr>
+                        <tr>
+                            <td>
+                                <div class="embarque-folio">#EMB-{{ e.id_embarque }}</div>
+                            </td>
+
+                            <td>
+                                {% if e.fecha_registro %}
+                                    {{ e.fecha_registro.strftime('%d/%m/%Y %H:%M') }}
+                                {% else %}
+                                    N/D
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if e.tipo_movimiento == 'Entrada' %}
+                                    <span class="badge badge-success">Entrada</span>
+                                {% else %}
+                                    <span class="badge badge-info">Salida</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <strong>{{ e.placas }}</strong><br>
+                                <span class="embarque-meta">{{ e.chofer }}</span>
+                            </td>
+
+                            <td>{{ e.origen_destino }}</td>
+
+                            <td>
+                                <span class="material-chip">{{ e.tipo_metal }}</span>
+                            </td>
+
+                            <td style="font-size: 0.88rem; color: var(--muted);">
+                                B: {{ e.peso_bruto_kg }} kg<br>
+                                T: {{ e.peso_tara_kg }} kg
+                            </td>
+
+                            <td>
+                                <strong style="color: var(--success); font-size: 1rem;">
+                                    {{ e.peso_neto_kg }} kg
+                                </strong>
+                            </td>
+                        </tr>
                     {% else %}
-                    <tr>
-                        <td colspan="8" style="text-align: center; padding: 40px; color: #a0aec0;">
-                            <i class="fas fa-truck" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
-                            No hay embarques registrados en la báscula.
-                        </td>
-                    </tr>
+                        <tr>
+                            <td colspan="8">
+                                <div class="empty-state">
+                                    <i class="fas fa-truck"></i>
+                                    No hay embarques registrados en la báscula.
+                                </div>
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    /*
+        Propósito:
+        Calcular visualmente el peso neto antes de enviar el formulario.
+    */
+    const pesoBrutoInput = document.getElementById("peso_bruto");
+    const pesoTaraInput = document.getElementById("peso_tara");
+    const netoPreview = document.getElementById("peso_neto_preview");
+
+    function actualizarPesoNeto() {
+        const bruto = parseFloat(pesoBrutoInput.value || "0");
+        const tara = parseFloat(pesoTaraInput.value || "0");
+        const neto = bruto - tara;
+
+        if (isNaN(neto) || neto < 0) {
+            netoPreview.textContent = "0.00 kg";
+            return;
+        }
+
+        netoPreview.textContent = `${neto.toFixed(2)} kg`;
+    }
+
+    if (pesoBrutoInput && pesoTaraInput) {
+        pesoBrutoInput.addEventListener("input", actualizarPesoNeto);
+        pesoTaraInput.addEventListener("input", actualizarPesoNeto);
+    }
+</script>
 {% endblock %}

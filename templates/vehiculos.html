@@ -1,51 +1,320 @@
 {% extends "base.html" %}
+
+{% block title %}Gestión de Flota - EcoData{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del módulo de vehículos.
+    */
+    .vehicle-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 18px;
+    }
+
+    .vehicle-card {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .vehicle-card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        background: var(--brand-blue);
+    }
+
+    .vehicle-card.disponible::before {
+        background: var(--success);
+    }
+
+    .vehicle-card.taller::before {
+        background: var(--warning);
+    }
+
+    .vehicle-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .vehicle-placa {
+        font-size: 1.12rem;
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .vehicle-modelo {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 0.9rem;
+    }
+
+    .vehicle-icon {
+        font-size: 1.35rem;
+        color: #cbd5e1;
+    }
+
+    .vehicle-meta {
+        margin-top: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .vehicle-capacidad {
+        color: #334155;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    .vehicle-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .vehicle-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .vehicle-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .vehicle-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .vehicle-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid" style="padding: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-        <h2 style="color: #2c3e50; font-weight: 700;"><i class="fas fa-truck-moving"></i> Flota de Transporte</h2>
-        <span class="badge" style="background: #e9ecef; color: #495057; padding: 10px 20px; border-radius: 50px;">Total: {{ vehiculos|length }} Unidades</span>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Gestión de flota</h1>
+        <p class="page-subtitle">
+            Administra unidades de transporte, capacidad de carga y disponibilidad operativa.
+        </p>
     </div>
 
-    <div class="row" style="display: flex; gap: 25px;">
-        <div style="flex: 1; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); height: fit-content;">
-            <h4 style="margin-bottom: 20px; color: #34495e;">Registrar Nueva Unidad</h4>
+    <a href="{{ url_for('transporte') }}" class="btn btn-secondary">
+        <i class="fas fa-truck-fast"></i>
+        Ir a despacho
+    </a>
+</div>
+
+{% set disponibles = vehiculos | selectattr('estado', 'equalto', 'Disponible') | list %}
+{% set en_ruta = vehiculos | selectattr('estado', 'equalto', 'En Ruta') | list %}
+{% set taller = vehiculos | selectattr('estado', 'equalto', 'Taller') | list %}
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Unidades totales</div>
+        <div class="kpi-value">{{ vehiculos|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Disponibles</div>
+        <div class="kpi-value">{{ disponibles|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">En ruta</div>
+        <div class="kpi-value">{{ en_ruta|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">En taller</div>
+        <div class="kpi-value">{{ taller|length }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-road"></i> Estado de la flota</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="vehicle-summary">
+                <div class="vehicle-summary-item">
+                    <div>
+                        <strong>Disponibles</strong>
+                        <span>Unidades listas para asignación</span>
+                    </div>
+                    <span class="badge badge-success">{{ disponibles|length }}</span>
+                </div>
+
+                <div class="vehicle-summary-item">
+                    <div>
+                        <strong>En ruta</strong>
+                        <span>Unidades actualmente en operación</span>
+                    </div>
+                    <span class="badge badge-info">{{ en_ruta|length }}</span>
+                </div>
+
+                <div class="vehicle-summary-item">
+                    <div>
+                        <strong>En taller</strong>
+                        <span>Unidades fuera de disponibilidad</span>
+                    </div>
+                    <span class="badge badge-warning">{{ taller|length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones operativas</h3>
+        </div>
+
+        <div class="card-body">
+            {% if vehiculos %}
+                <div class="vehicle-empty-note">
+                    Mantén actualizados los estados de las unidades para evitar asignaciones duplicadas
+                    y mejorar la planeación del despacho y las rutas.
+                </div>
+            {% else %}
+                <div class="vehicle-empty-note">
+                    Registra tu primera unidad para comenzar a usar el flujo de despacho y logística.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-3">
+    <div class="card" style="grid-column: span 1;">
+        <div class="card-header">
+            <h3><i class="fas fa-plus-circle"></i> Registrar nueva unidad</h3>
+        </div>
+
+        <div class="card-body">
             <form method="POST">
-                <div style="margin-bottom: 15px;">
-                    <label style="display:block; margin-bottom:5px; font-weight:600;">Placa / Matrícula</label>
-                    <input type="text" name="placa" class="form-control" style="width:100%; padding:12px; border-radius:8px; border:1px solid #dee2e6;" placeholder="Ej: MX-9982" required>
+                <div class="field" style="margin-bottom: 16px;">
+                    <label for="placa">Placa / matrícula</label>
+                    <input
+                        id="placa"
+                        type="text"
+                        name="placa"
+                        class="input"
+                        placeholder="Ej. MX-9982"
+                        required
+                    />
                 </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display:block; margin-bottom:5px; font-weight:600;">Modelo y Marca</label>
-                    <input type="text" name="modelo" class="form-control" style="width:100%; padding:12px; border-radius:8px; border:1px solid #dee2e6;" placeholder="Ej: Volvo FH16" required>
+
+                <div class="field" style="margin-bottom: 16px;">
+                    <label for="modelo">Modelo y marca</label>
+                    <input
+                        id="modelo"
+                        type="text"
+                        name="modelo"
+                        class="input"
+                        placeholder="Ej. Volvo FH16"
+                        required
+                    />
                 </div>
-                <div style="margin-bottom: 20px;">
-                    <label style="display:block; margin-bottom:5px; font-weight:600;">Capacidad de Carga (kg)</label>
-                    <input type="number" name="capacidad" class="form-control" style="width:100%; padding:12px; border-radius:8px; border:1px solid #dee2e6;" placeholder="15000" required>
+
+                <div class="field" style="margin-bottom: 18px;">
+                    <label for="capacidad">Capacidad de carga (kg)</label>
+                    <input
+                        id="capacidad"
+                        type="number"
+                        name="capacidad"
+                        class="input"
+                        placeholder="15000"
+                        min="0"
+                        step="0.01"
+                        required
+                    />
                 </div>
-                <button type="submit" style="width:100%; background:#27ae60; color:white; border:none; padding:15px; border-radius:8px; font-weight:700; cursor:pointer; transition: 0.3s;">
-                    + Agregar a la Flota
+
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    <i class="fas fa-truck-moving"></i>
+                    Agregar a la flota
                 </button>
             </form>
         </div>
+    </div>
 
-        <div style="flex: 2;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+            <h3><i class="fas fa-truck"></i> Unidades registradas</h3>
+            <span class="badge badge-neutral">{{ vehiculos|length }} unidades</span>
+        </div>
+
+        <div class="card-body">
+            <div class="vehicle-card-grid">
                 {% for v in vehiculos %}
-                <div style="background:white; border-radius:12px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.03); border-left: 5px solid {{ '#2ecc71' if v.estado == 'Disponible' else '#f1c40f' }};">
-                    <div style="display:flex; justify-content:space-between; align-items:start;">
-                        <div>
-                            <h3 style="margin:0; color:#2c3e50;">{{ v.placa }}</h3>
-                            <p style="margin:5px 0; color:#7f8c8d;">{{ v.modelo }}</p>
+                    <div class="vehicle-card {% if v.estado == 'Disponible' %}disponible{% elif v.estado == 'Taller' %}taller{% endif %}">
+                        <div class="vehicle-card-header">
+                            <div>
+                                <div class="vehicle-placa">{{ v.placa }}</div>
+                                <div class="vehicle-modelo">{{ v.modelo }}</div>
+                            </div>
+
+                            <i class="fas fa-truck vehicle-icon"></i>
                         </div>
-                        <i class="fas fa-truck" style="font-size: 1.5em; color: #dcdde1;"></i>
+
+                        <div class="vehicle-meta">
+                            <span class="vehicle-capacidad">
+                                <i class="fas fa-box"></i>
+                                {{ v.capacidad_kg or 0 }} kg
+                            </span>
+
+                            {% if v.estado == 'Disponible' %}
+                                <span class="badge badge-success">Disponible</span>
+                            {% elif v.estado == 'En Ruta' %}
+                                <span class="badge badge-info">En ruta</span>
+                            {% elif v.estado == 'Taller' %}
+                                <span class="badge badge-warning">Taller</span>
+                            {% else %}
+                                <span class="badge badge-neutral">{{ v.estado }}</span>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div style="margin-top: 15px; display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size: 0.9em; font-weight:600; color:#34495e;">📦 Cap: {{ v.capacidad_kg }}kg</span>
-                        <span style="padding:5px 12px; border-radius:20px; font-size:0.8em; font-weight:700; background: {{ '#e8f8f0' if v.estado == 'Disponible' else '#fff9db' }}; color: {{ '#1e7e34' if v.estado == 'Disponible' else '#856404' }};">
-                            {{ v.estado }}
-                        </span>
+                {% else %}
+                    <div class="card" style="grid-column: 1 / -1;">
+                        <div class="card-body">
+                            <div class="empty-state">
+                                <i class="fas fa-truck"></i>
+                                No hay unidades registradas todavía.
+                            </div>
+                        </div>
                     </div>
-                </div>
                 {% endfor %}
             </div>
         </div>

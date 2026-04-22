@@ -1,253 +1,1023 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}Ecodata{% endblock %}</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}EcoData{% endblock %}</title>
+
+    <!--
+        Propósito:
+        Cargar tipografía e iconos globales del sistema.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    />
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+
     <style>
-        /* Estilos Generales */
-        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f8f9fa; overflow: hidden; }
-        
-        /* Barra Lateral (Sidebar) */
-        .sidebar { 
-            width: 260px; 
-            background-color: #343a40; 
-            color: white; 
-            display: flex; 
-            flex-direction: column; 
-            transition: margin-left 0.3s ease; /* Animación para ocultar */
+        /*
+            Propósito:
+            Variables globales de color y diseño del sistema.
+        */
+        :root {
+            --brand-blue: #2796db;
+            --brand-blue-dark: #1f78b2;
+            --brand-green: #2c9c68;
+            --brand-green-dark: #237d54;
+            --brand-dark: #0f172a;
+            --brand-dark-soft: #1e293b;
+            --bg-soft: #f4f7fb;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1f2937;
+            --muted: #64748b;
+            --success: #16a34a;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --info: #2563eb;
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            --radius: 18px;
+            --radius-sm: 12px;
+        }
+
+        /*
+            Propósito:
+            Reset básico del sistema.
+        */
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: "Inter", sans-serif;
+            background: var(--bg-soft);
+            color: var(--text);
+        }
+
+        body {
+            display: flex;
+            overflow: hidden;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font-family: inherit;
+        }
+
+        /*
+            Propósito:
+            Sidebar principal del sistema.
+        */
+        .sidebar {
+            width: 300px;
+            min-width: 300px;
+            background:
+                linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(17, 24, 39, 1) 100%);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
             overflow-y: auto;
+            box-shadow: 12px 0 32px rgba(15, 23, 42, 0.16);
+            transition: transform 0.25s ease, width 0.25s ease, min-width 0.25s ease;
+            z-index: 30;
+        }
+
+        .sidebar.oculta {
+            width: 0;
+            min-width: 0;
+            transform: translateX(-100%);
+        }
+
+        .sidebar-brand {
+            padding: 22px 18px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            position: sticky;
+            top: 0;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.99) 0%, rgba(15, 23, 42, 0.96) 100%);
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+
+        .brand-wrap {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-logo {
+            width: 58px;
+            height: 58px;
+            object-fit: contain;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.07);
+            padding: 6px;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+        }
+
+        .brand-text h1 {
+            margin: 0;
+            font-size: 1.24rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: 0.02em;
+        }
+
+        .brand-text p {
+            margin: 4px 0 0;
+            font-size: 0.86rem;
+            color: #94a3b8;
+        }
+
+        .nav-section {
+            padding: 14px 12px 20px;
+        }
+
+        .enlace-solo,
+        .menu-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            color: #cbd5e1;
+            font-size: 0.94rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .enlace-solo:hover,
+        .menu-link:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #ffffff;
+        }
+
+        .enlace-solo.active,
+        .menu-link.active {
+            background: linear-gradient(90deg, rgba(39, 150, 219, 0.18) 0%, rgba(44, 156, 104, 0.12) 100%);
+            color: #ffffff;
+            border: 1px solid rgba(96, 165, 250, 0.16);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+        }
+
+        .menu-principal {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: #f8fafc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 13px 14px;
+            margin-top: 10px;
+            border-radius: 14px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+
+        .menu-principal:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .menu-principal .izq {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .submenu {
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 14px;
+        }
+
+        .submenu.abierto {
+            display: flex;
+        }
+
+        .badge-alerta {
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+        }
+
+        /*
+            Propósito:
+            Área principal del sistema.
+        */
+        .main-content {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .topbar {
+            height: 78px;
+            background: rgba(255, 255, 255, 0.94);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 22px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+            backdrop-filter: blur(10px);
+            z-index: 20;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .btn-toggle {
+            border: none;
+            background: var(--brand-dark);
+            color: #fff;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.2s ease;
             flex-shrink: 0;
         }
-        .sidebar.oculta { margin-left: -260px; } /* Clase que oculta la barra */
-        .sidebar h2 { text-align: center; padding: 20px 0; background-color: #23272b; margin: 0; letter-spacing: 2px;}
-        
-        /* Botones Principales y Submenús */
-        .menu-principal { padding: 15px; cursor: pointer; border-bottom: 1px solid #495057; display: flex; justify-content: space-between; font-weight: bold; user-select: none;}
-        .menu-principal:hover { background-color: #495057; }
-        .submenu { display: none; background-color: #2c3136; flex-direction: column; }
-        .submenu.abierto { display: flex; } /* Clase que muestra el submenú */
-        .submenu a { color: #adb5bd; padding: 12px 15px 12px 30px; text-decoration: none; border-bottom: 1px solid #3d444b; font-size: 0.9em;}
-        .submenu a:hover, .sidebar a.active { background-color: #495057; color: white; border-left: 4px solid #28a745; padding-left: 26px;}
-        
-        /* Enlace suelto (Inicio) */
-        .enlace-solo { color: white; padding: 15px; text-decoration: none; border-bottom: 1px solid #495057; font-weight: bold; display: block;}
-        .enlace-solo:hover { background-color: #495057; }
 
-        /* Contenido Principal */
-        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        
-        /* Barra Superior (Topbar) */
-        .topbar { background: white; padding: 15px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; z-index: 10;}
-        .btn-toggle { background: #343a40; color: white; border: none; padding: 8px 12px; font-size: 1.2em; border-radius: 4px; cursor: pointer; transition: 0.2s;}
-        .btn-toggle:hover { background: #28a745; }
-        .btn-logout { color: #dc3545; text-decoration: none; font-weight: bold; margin-left: 15px;}
-        
-        /* Área donde irá el contenido de cada pantalla */
-        .contenedor-pantalla { padding: 20px; overflow-y: auto; flex: 1; }
+        .btn-toggle:hover {
+            background: var(--brand-blue);
+        }
+
+        .topbar-title {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .topbar-title strong {
+            font-size: 1rem;
+            color: var(--brand-dark);
+        }
+
+        .topbar-title span {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .topbar-user {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 0.94rem;
+            color: var(--muted);
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .topbar-user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: #fff;
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .topbar-mini-logo {
+            width: 28px;
+            height: 28px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 3px;
+        }
+
+        .btn-logout {
+            background: #ef4444;
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+            transition: 0.2s ease;
+        }
+
+        .btn-logout:hover {
+            background: #dc2626;
+        }
+
+        .contenedor-pantalla {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        /*
+            Propósito:
+            Componentes globales reutilizables.
+        */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+        }
+
+        .page-title {
+            margin: 0;
+            font-size: 1.78rem;
+            font-weight: 800;
+            color: var(--brand-dark);
+            letter-spacing: -0.02em;
+        }
+
+        .page-subtitle {
+            margin: 8px 0 0;
+            font-size: 0.96rem;
+            color: var(--muted);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .card-header h3,
+        .card-header h4 {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--brand-dark);
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 18px;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .kpi {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .kpi-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .kpi-value {
+            margin-top: 10px;
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: var(--brand-dark);
+        }
+
+        .form-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .form-grid.cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .form-grid.cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .form-grid.cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            color: #334155;
+            font-size: 0.86rem;
+            font-weight: 700;
+        }
+
+        .input,
+        .select,
+        .textarea {
+            width: 100%;
+            border: 1px solid #dbe2ea;
+            background: #fff;
+            color: var(--text);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .input:focus,
+        .select:focus,
+        .textarea:focus {
+            outline: none;
+            border-color: rgba(39, 150, 219, 0.5);
+            box-shadow: 0 0 0 4px rgba(39, 150, 219, 0.12);
+        }
+
+        .textarea {
+            resize: vertical;
+            min-height: 110px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: none;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-size: 0.94rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--brand-blue);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--brand-blue-dark);
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #15803d;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: #fff;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-sm {
+            padding: 9px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        .table-shell {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            text-align: left;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            color: #64748b;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .table td {
+            padding: 16px;
+            border-bottom: 1px solid #edf2f7;
+            vertical-align: middle;
+            color: #334155;
+        }
+
+        .table tr:hover td {
+            background: #fafcff;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .badge-neutral {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-info {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 42px 20px;
+            color: var(--muted);
+        }
+
+        .empty-state i {
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+            display: block;
+            color: #94a3b8;
+        }
+
+        /*
+            Propósito:
+            Mensajes flash globales.
+        */
+        .flash-stack {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .flash {
+            border-radius: 16px;
+            padding: 14px 16px;
+            font-size: 0.94rem;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+
+        .flash-success {
+            background: #ecfdf5;
+            color: #065f46;
+            border-color: #a7f3d0;
+        }
+
+        .flash-danger,
+        .flash-error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-color: #fecaca;
+        }
+
+        .flash-warning {
+            background: #fffbeb;
+            color: #92400e;
+            border-color: #fde68a;
+        }
+
+        .flash-info {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+
+        /*
+            Propósito:
+            Responsive principal del sistema.
+        */
+        @media (max-width: 1180px) {
+            .grid-4,
+            .grid-3,
+            .form-grid.cols-4,
+            .form-grid.cols-3 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 860px) {
+            body {
+                overflow: auto;
+            }
+
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+            }
+
+            .sidebar.oculta {
+                width: 300px;
+                min-width: 300px;
+                transform: translateX(-100%);
+            }
+
+            .contenedor-pantalla {
+                padding: 18px;
+            }
+
+            .topbar {
+                height: auto;
+                padding: 14px 18px;
+                align-items: flex-start;
+                gap: 14px;
+                flex-direction: column;
+            }
+
+            .topbar-user {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .grid-2,
+            .grid-3,
+            .grid-4,
+            .form-grid.cols-2,
+            .form-grid.cols-3,
+            .form-grid.cols-4 {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
+
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
+    {% set current_path = request.path %}
 
-    <div class="sidebar" id="miSidebar">
-        <h2>ECODATA</h2>
-        
-        <a href="/dashboard" class="enlace-solo">🏠 Inicio</a>
+    <aside class="sidebar" id="miSidebar">
+        <!--
+            Propósito:
+            Mostrar branding principal del sistema con logo oficial.
+        -->
+        <div class="sidebar-brand">
+            <div class="brand-wrap">
+                <img
+                    src="{{ url_for('static', filename='img/ecodata-logo.png') }}"
+                    alt="Logo EcoData"
+                    class="brand-logo"
+                />
 
-        <div class="menu-principal" onclick="toggleSubmenu('sub-inventario')">
-            <span>📦 Inventario y Almacenes</span> <span>▾</span>
-        </div>
-        <div class="submenu" id="sub-inventario">
-            <a href="/productos">Catálogo de Productos</a>
-            <a href="/inventario_productos">Stock Terminados</a>
-            <a href="/inventario">
-                <i class="fas fa-chart-pie"></i> Dashboard de Metales
-            </a>
-            <a href="/almacenes">
-                <i class="fas fa-warehouse"></i> Zonas y Almacenes
-            </a>
-        </div>
-
-        <div class="menu-principal" onclick="toggleSubmenu('sub-produccion')">
-            <span>⚙️ Producción</span> <span>▾</span>
-        </div>
-        <div class="submenu" id="sub-produccion">
-            <a href="/procesos">Procesos de Fabricación</a>
-            <a href="/reciclaje">
-                <i class="fas fa-fire-alt"></i> Fundición y Reciclaje
-            </a>
-            <a href="/maquinaria">
-                <i class="fas fa-cogs"></i> Control de Maquinaria
-            </a>
-        </div>
-
-       <div class="menu-principal" onclick="toggleSubmenu('sub-mantenimiento')" style="display: flex; justify-content: space-between; align-items: center;">
-    <span>🛠️ Mantenimiento y Equipos</span>
-    <div style="display: flex; align-items: center; gap: 8px;">
-        {% if global_alertas and global_alertas > 0 %}
-            <span class="badge-alerta">{{ global_alertas }}</span>
-        {% endif %}
-        <span>▾</span>
-    </div>
-</div>
-<div class="submenu" id="sub-mantenimiento">
-    <a href="/mantenimiento">Bitácora Técnica</a>
-    <a href="/mantenimiento/alertas" style="display: flex; justify-content: space-between;">
-        Alertas de Atención
-       {% if conteo_alertas > 0 %}
-        <span style="
-            background-color: #e74a3b; 
-            color: white; 
-            border-radius: 50%; 
-            padding: 2px 7px; 
-            font-size: 0.75rem; 
-            font-weight: bold; 
-            margin-left: 5px;
-            display: inline-block;
-            vertical-align: middle;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-            {{ conteo_alertas }}
-        </span>
-    {% endif %}
-    </a>
-</div>
-
-<style>
-    .badge-alerta {
-        background-color: #dc3545;
-        color: white;
-        font-size: 0.7em;
-        padding: 2px 7px;
-        border-radius: 50%;
-        font-weight: bold;
-        box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
-        animation: pulse-red 2s infinite;
-    }
-
-    @keyframes pulse-red {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
-        70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
-    }
-</style>
-        
-        <div class="menu-principal" onclick="toggleSubmenu('sub-logistica')">
-            <span>🚚 Logística y Entregas</span> <span>▾</span>
-        </div>
-        <div class="submenu" id="sub-logistica">
-            <a href="/transporte">
-                <i class="fas fa-shipping-fast"></i> Despacho de Pedidos
-            </a>
-            <a href="/vehiculos">
-                <i class="fas fa-truck"></i> Gestión de Flota
-            </a>
-            <a href="/choferes">
-                <i class="fas fa-id-card"></i> Directorio de Choferes
-            </a>
-            <a href="/embarques">
-                <i class="fas fa-truck-moving"></i> Control de Báscula
-            </a>
-            <a href="/dispatch" style="background-color: #e2e8f0; color: #2d3748; font-weight: bold;">
-                <i class="fas fa-map-marked-alt"></i> Asignación de Rutas
-            </a>
-        </div>
-
-        <div class="menu-principal" onclick="toggleSubmenu('sub-calidad')">
-            <span>🛡️ Control de Calidad</span> <span>▾</span>
-        </div>
-        <div class="submenu" id="sub-calidad">
-            <a href="/calidad">Registrar Inspección</a>
-            <a href="/reportes_calidad">Reportes de Rechazo</a>
-        </div>
-
-        <div class="menu-principal" onclick="toggleSubmenu('sub-compras')">
-            <span>🛒 Compras y Abastecimiento</span> <span>▾</span>
-        </div>
-        <div class="submenu" id="sub-compras">
-            <a href="/compras">
-                <i class="fas fa-shopping-cart"></i> Registro de Compras
-            </a>
-            <a href="/proveedores">
-                <i class="fas fa-address-book"></i> Directorio Proveedores
-            </a>
-            <a href="/historial_compras" style="background-color: #e2e8f0; color: #2d3748; font-weight: bold;">
-                <i class="fas fa-list"></i> Historial de Compras
-            </a>
-
-
-        </div>
-
-        {% if session.get('rol') == 'Administrador' %}
-        <div class="menu-principal" onclick="toggleSubmenu('sub-comercial')">
-            <span>🤝 Comercial y Finanzas</span> <span>▾</span>
-        </div>
-        <div class="submenu" id="sub-comercial">
-            <a href="/dash_comercial" style="background-color: #e8f5e9; color: #1b5e20; font-weight: bold;">📈 Dashboard Comercial</a>
-            <a href="/clientes">Directorio de Clientes</a>
-            <a href="/ventas">Ventas y Clientes</a>
-            <a href="/contabilidad">Administración Contable</a>
-            <a class="collapse-item" href="{{ url_for('lista_pedidos') }}">
-                <i class="fas fa-shopping-basket"></i> Pedidos de Venta
-            </a>
-        </div>
-        <div class="menu-principal" onclick="toggleSubmenu('sub-personal')">
-            <span>👥 Personal y Accesos</span> <span>▾</span>
-        </div>
-        <div class="submenu" id="sub-personal">
-            <a href="/areas">
-                <i class="fas fa-building"></i> Departamentos / Áreas
-            </a>
-            
-            <a href="/personal">
-                <i class="fas fa-users"></i> Gestión de Personal
-            </a>
-            <a href="/privilegios">
-                <i class="fas fa-user-shield"></i> Privilegios y Roles
-            </a>
-
-            <a href="/auditoria">
-                <i class="fas fa-clipboard-list"></i> Auditoría de Movimientos
-        </div>
-
-        {% endif %}
-    </div>
-
-    <div class="main-content">
-        <div class="topbar">
-            <div>
-                <button class="btn-toggle" onclick="toggleSidebar()">☰ Menú</button>
+                <div class="brand-text">
+                    <h1>EcoData</h1>
+                    <p>ERP industrial y logístico</p>
+                </div>
             </div>
-            <div>
-                <span>Bienvenido, <strong>{{ session.get('usuario', 'Usuario') }}</strong></span>
-                <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+        </div>
+
+        <div class="nav-section">
+            <a
+                href="/dashboard"
+                class="enlace-solo {% if current_path == '/dashboard' %}active{% endif %}"
+            >
+                <i class="fas fa-house"></i>
+                <span>Inicio</span>
+            </a>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-inventario')">
+                <span class="izq"><i class="fas fa-boxes-stacked"></i> Inventario y Almacenes</span>
+                <span><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/productos', '/inventario_productos', '/inventario', '/almacenes'] %}abierto{% endif %}"
+                id="sub-inventario"
+            >
+                <a href="/productos" class="menu-link {% if current_path == '/productos' %}active{% endif %}">
+                    <i class="fas fa-tags"></i> Catálogo de Productos
+                </a>
+                <a href="/inventario_productos" class="menu-link {% if current_path == '/inventario_productos' %}active{% endif %}">
+                    <i class="fas fa-cubes"></i> Stock Terminados
+                </a>
+                <a href="/inventario" class="menu-link {% if current_path == '/inventario' %}active{% endif %}">
+                    <i class="fas fa-chart-pie"></i> Dashboard de Metales
+                </a>
+                <a href="/almacenes" class="menu-link {% if current_path == '/almacenes' %}active{% endif %}">
+                    <i class="fas fa-warehouse"></i> Zonas y Almacenes
+                </a>
+            </div>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-produccion')">
+                <span class="izq"><i class="fas fa-gears"></i> Producción</span>
+                <span><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/procesos', '/reciclaje', '/maquinaria'] %}abierto{% endif %}"
+                id="sub-produccion"
+            >
+                <a href="/procesos" class="menu-link {% if current_path == '/procesos' %}active{% endif %}">
+                    <i class="fas fa-industry"></i> Procesos de Fabricación
+                </a>
+                <a href="/reciclaje" class="menu-link {% if current_path == '/reciclaje' %}active{% endif %}">
+                    <i class="fas fa-recycle"></i> Fundición y Reciclaje
+                </a>
+                <a href="/maquinaria" class="menu-link {% if current_path == '/maquinaria' %}active{% endif %}">
+                    <i class="fas fa-screwdriver-wrench"></i> Control de Maquinaria
+                </a>
+            </div>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-mantenimiento')">
+                <span class="izq"><i class="fas fa-wrench"></i> Mantenimiento y Equipos</span>
+                <span style="display:flex; align-items:center; gap:8px;">
+                    {% if global_alertas is defined and global_alertas > 0 %}
+                        <span class="badge-alerta">{{ global_alertas }}</span>
+                    {% endif %}
+                    <i class="fas fa-chevron-down"></i>
+                </span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/mantenimiento', '/mantenimiento/alertas'] %}abierto{% endif %}"
+                id="sub-mantenimiento"
+            >
+                <a href="/mantenimiento" class="menu-link {% if current_path == '/mantenimiento' %}active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i> Bitácora Técnica
+                </a>
+                <a href="/mantenimiento/alertas" class="menu-link {% if current_path == '/mantenimiento/alertas' %}active{% endif %}">
+                    <i class="fas fa-triangle-exclamation"></i> Alertas
+                </a>
+            </div>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-logistica')">
+                <span class="izq"><i class="fas fa-truck-fast"></i> Logística y Entregas</span>
+                <span><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/transporte', '/vehiculos', '/choferes', '/embarques', '/dispatch'] %}abierto{% endif %}"
+                id="sub-logistica"
+            >
+                <a href="/transporte" class="menu-link {% if current_path == '/transporte' %}active{% endif %}">
+                    <i class="fas fa-shipping-fast"></i> Despacho de Pedidos
+                </a>
+                <a href="/vehiculos" class="menu-link {% if current_path == '/vehiculos' %}active{% endif %}">
+                    <i class="fas fa-truck"></i> Gestión de Flota
+                </a>
+                <a href="/choferes" class="menu-link {% if current_path == '/choferes' %}active{% endif %}">
+                    <i class="fas fa-id-card"></i> Directorio de Choferes
+                </a>
+                <a href="/embarques" class="menu-link {% if current_path == '/embarques' %}active{% endif %}">
+                    <i class="fas fa-weight-hanging"></i> Control de Báscula
+                </a>
+                <a href="/dispatch" class="menu-link {% if current_path == '/dispatch' %}active{% endif %}">
+                    <i class="fas fa-map-location-dot"></i> Asignación de Rutas
+                </a>
+            </div>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-calidad')">
+                <span class="izq"><i class="fas fa-shield-halved"></i> Control de Calidad</span>
+                <span><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/calidad', '/reportes_calidad'] %}abierto{% endif %}"
+                id="sub-calidad"
+            >
+                <a href="/calidad" class="menu-link {% if current_path == '/calidad' %}active{% endif %}">
+                    <i class="fas fa-clipboard-check"></i> Registrar Inspección
+                </a>
+                <a href="/reportes_calidad" class="menu-link {% if current_path == '/reportes_calidad' %}active{% endif %}">
+                    <i class="fas fa-file-waveform"></i> Reportes de Rechazo
+                </a>
+            </div>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-compras')">
+                <span class="izq"><i class="fas fa-cart-shopping"></i> Compras y Abastecimiento</span>
+                <span><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/compras', '/proveedores', '/historial_compras'] %}abierto{% endif %}"
+                id="sub-compras"
+            >
+                <a href="/compras" class="menu-link {% if current_path == '/compras' %}active{% endif %}">
+                    <i class="fas fa-basket-shopping"></i> Registro de Compras
+                </a>
+                <a href="/proveedores" class="menu-link {% if current_path == '/proveedores' %}active{% endif %}">
+                    <i class="fas fa-address-book"></i> Directorio Proveedores
+                </a>
+                <a href="/historial_compras" class="menu-link {% if current_path == '/historial_compras' %}active{% endif %}">
+                    <i class="fas fa-clock-rotate-left"></i> Historial de Compras
+                </a>
+            </div>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-comercial')">
+                <span class="izq"><i class="fas fa-chart-line"></i> Comercial y Finanzas</span>
+                <span><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/dash_comercial', '/clientes', '/ventas', '/contabilidad', '/pedidos', '/nuevo_pedido'] or current_path.startswith('/pedido/') %}abierto{% endif %}"
+                id="sub-comercial"
+            >
+                <a href="/dash_comercial" class="menu-link {% if current_path == '/dash_comercial' %}active{% endif %}">
+                    <i class="fas fa-chart-area"></i> Dashboard Comercial
+                </a>
+                <a href="/clientes" class="menu-link {% if current_path == '/clientes' %}active{% endif %}">
+                    <i class="fas fa-users"></i> Directorio de Clientes
+                </a>
+                <a href="/ventas" class="menu-link {% if current_path == '/ventas' %}active{% endif %}">
+                    <i class="fas fa-cash-register"></i> Ventas y Clientes
+                </a>
+                <a href="/contabilidad" class="menu-link {% if current_path == '/contabilidad' %}active{% endif %}">
+                    <i class="fas fa-wallet"></i> Administración Contable
+                </a>
+                <a href="/pedidos" class="menu-link {% if current_path == '/pedidos' or current_path == '/nuevo_pedido' or current_path.startswith('/pedido/') %}active{% endif %}">
+                    <i class="fas fa-box"></i> Pedidos de Venta
+                </a>
+            </div>
+
+            <button class="menu-principal" type="button" onclick="toggleSubmenu('sub-personal')">
+                <span class="izq"><i class="fas fa-user-shield"></i> Personal y Accesos</span>
+                <span><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div
+                class="submenu {% if current_path in ['/areas', '/personal', '/privilegios', '/auditoria'] %}abierto{% endif %}"
+                id="sub-personal"
+            >
+                <a href="/areas" class="menu-link {% if current_path == '/areas' %}active{% endif %}">
+                    <i class="fas fa-building"></i> Departamentos / Áreas
+                </a>
+                <a href="/personal" class="menu-link {% if current_path == '/personal' %}active{% endif %}">
+                    <i class="fas fa-user-group"></i> Gestión de Personal
+                </a>
+                <a href="/privilegios" class="menu-link {% if current_path == '/privilegios' %}active{% endif %}">
+                    <i class="fas fa-key"></i> Privilegios y Roles
+                </a>
+                <a href="/auditoria" class="menu-link {% if current_path == '/auditoria' %}active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i> Auditoría
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <!--
+            Propósito:
+            Barra superior del sistema.
+        -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <button class="btn-toggle" type="button" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+
+                <div class="topbar-title">
+                    <strong>{{ session.get('usuario', 'Usuario') }}</strong>
+                    <span>Panel operativo EcoData</span>
+                </div>
+            </div>
+
+            <div class="topbar-user">
+                <div class="topbar-user-chip">
+                    <img
+                        src="{{ url_for('static', filename='img/ecodata-logo.png') }}"
+                        alt="Mini logo EcoData"
+                        class="topbar-mini-logo"
+                    />
+                    <span>{{ session.get('rol', 'Usuario') }}</span>
+                </div>
+
+                <a href="/logout" class="btn-logout">
+                    <i class="fas fa-right-from-bracket"></i>
+                    Cerrar sesión
+                </a>
             </div>
         </div>
 
         <div class="contenedor-pantalla">
-            {% block content %}
-            {% endblock %}
+            <!--
+                Propósito:
+                Mostrar mensajes flash globales.
+            -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-stack">
+                        {% for category, message in messages %}
+                            <div class="flash flash-{{ category }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
         </div>
-    </div>
+    </main>
 
     <script>
-        // Función para ocultar/mostrar toda la barra lateral
+        /*
+            Propósito:
+            Mostrar y ocultar la barra lateral.
+        */
         function toggleSidebar() {
-            const sidebar = document.getElementById('miSidebar');
-            sidebar.classList.toggle('oculta');
+            const sidebar = document.getElementById("miSidebar");
+            sidebar.classList.toggle("oculta");
         }
 
-        // Función para abrir/cerrar los submenús
+        /*
+            Propósito:
+            Mostrar y ocultar submenús del sidebar.
+        */
         function toggleSubmenu(idSubmenu) {
             const submenu = document.getElementById(idSubmenu);
-            // Cerramos todos los demás submenús para que se vea limpio
-            const todosLosSubmenus = document.querySelectorAll('.submenu');
-            todosLosSubmenus.forEach(sub => {
-                if(sub.id !== idSubmenu) {
-                    sub.classList.remove('abierto');
-                }
-            });
-            // Alternamos el que el usuario hizo clic
-            submenu.classList.toggle('abierto');
+            if (!submenu) return;
+            submenu.classList.toggle("abierto");
         }
     </script>
+
+    {% block extra_scripts %}{% endblock %}
 </body>
 </html>

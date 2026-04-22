@@ -1,205 +1,587 @@
 {% extends "base.html" %}
 
-{% block title %}Panel de Control - Ecodata{% endblock %}
+{% block title %}Dashboard - EcoData{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del dashboard principal.
+    */
+    .dashboard-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        background:
+            radial-gradient(circle at top left, rgba(39, 150, 219, 0.14) 0%, transparent 34%),
+            radial-gradient(circle at bottom right, rgba(44, 156, 104, 0.14) 0%, transparent 30%),
+            linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: var(--shadow);
+        margin-bottom: 22px;
+    }
+
+    .dashboard-hero-inner {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 24px;
+        padding: 28px;
+        align-items: center;
+    }
+
+    .dashboard-hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(39, 150, 219, 0.12);
+        border: 1px solid rgba(39, 150, 219, 0.14);
+        color: var(--brand-blue-dark);
+        font-size: 0.84rem;
+        font-weight: 800;
+        margin-bottom: 14px;
+    }
+
+    .dashboard-hero h2 {
+        margin: 0;
+        font-size: 2.2rem;
+        line-height: 1.08;
+        letter-spacing: -0.04em;
+        color: var(--brand-dark);
+    }
+
+    .dashboard-hero p {
+        margin: 16px 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.7;
+        max-width: 740px;
+    }
+
+    .dashboard-hero-actions {
+        margin-top: 22px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-hero-side {
+        display: grid;
+        gap: 14px;
+    }
+
+    .mini-stat-card {
+        background: rgba(255, 255, 255, 0.74);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    }
+
+    .mini-stat-card .label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 800;
+        color: var(--muted);
+    }
+
+    .mini-stat-card .value {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: var(--brand-dark);
+        margin-top: 8px;
+    }
+
+    .module-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .module-card {
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .module-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 34px rgba(15, 23, 42, 0.09);
+    }
+
+    .module-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+        color: #fff;
+        margin-bottom: 14px;
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+    }
+
+    .module-card h4 {
+        margin: 0;
+        font-size: 1rem;
+        color: var(--brand-dark);
+    }
+
+    .module-card p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+
+    .module-card .go {
+        margin-top: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--brand-blue-dark);
+        font-weight: 800;
+        font-size: 0.9rem;
+    }
+
+    .activity-list,
+    .shortcut-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .activity-item,
+    .shortcut-item {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .activity-icon,
+    .shortcut-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #fff;
+        font-size: 1rem;
+    }
+
+    .activity-body strong,
+    .shortcut-body strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .activity-body span,
+    .shortcut-body span {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.55;
+    }
+
+    .status-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .status-row strong {
+        color: var(--brand-dark);
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .status-row span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    @media (max-width: 1180px) {
+        .dashboard-hero-inner {
+            grid-template-columns: 1fr;
+        }
+
+        .module-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 780px) {
+        .module-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .dashboard-hero h2 {
+            font-size: 1.8rem;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+{% set s = stats|default({}, true) %}
+{% set actividad = actividad_reciente|default([], true) %}
 
-<style>
-    /* Contenedor Principal */
-    .dashboard-wrapper { padding: 25px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fc; }
-
-    /* Cabecera */
-    .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-    .btn-excel { 
-        background: #1cc88a; color: white; padding: 12px 24px; border-radius: 10px; 
-        text-decoration: none; font-weight: bold; display: flex; align-items: center; 
-        gap: 10px; transition: 0.3s; box-shadow: 0 4px 12px rgba(28, 200, 138, 0.2); 
-    }
-    .btn-excel:hover { background: #17a673; transform: translateY(-2px); }
-
-    /* --- NUEVOS ESTILOS PARA ALERTAS --- */
-    .alert-container { margin-bottom: 25px; }
-    .alert-item {
-        padding: 15px 20px;
-        border-radius: 12px;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        font-size: 0.9rem;
-        border-left: 6px solid;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        animation: fadeIn 0.5s ease-in-out;
-    }
-    .alert-peligro { background: #fff1f0; color: #842029; border-color: #e74a3b; }
-    .alert-advertencia { background: #fff9e6; color: #664d03; border-color: #f6c23e; }
-    .alert-item i { font-size: 1.2rem; }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Cuadrícula de KPIs */
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
-    .kpi-card { 
-        background: white; padding: 20px; border-radius: 12px; border: 1px solid #eef0f3; 
-        text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.03); border-top: 4px solid #d1d3e2;
-    }
-    .kpi-card h3 { margin: 0; color: #858796; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
-    .kpi-card .value { font-size: 1.8rem; font-weight: bold; margin: 10px 0; display: block; }
-    
-    /* Colores Temáticos */
-    .border-blue { border-top-color: #4e73df; }
-    .border-green { border-top-color: #1cc88a; }
-    .border-yellow { border-top-color: #f6c23e; }
-    .border-red { border-top-color: #e74a3b; }
-    .border-cyan { border-top-color: #36b9cc; }
-
-    .color-blue { color: #4e73df; }
-    .color-green { color: #1cc88a; }
-    .color-yellow { color: #f6c23e; }
-    .color-red { color: #e74a3b; }
-    .color-cyan { color: #36b9cc; }
-
-    /* Gráficas */
-    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .chart-box { background: white; padding: 25px; border-radius: 12px; border: 1px solid #eef0f3; box-shadow: 0 4px 6px rgba(0,0,0,0.03); }
-    .chart-full { grid-column: span 2; }
-    .chart-box h4 { margin-top: 0; color: #5a5c69; font-size: 0.9rem; text-align: center; border-bottom: 1px solid #f8f9fa; padding-bottom: 15px; margin-bottom: 20px; }
-</style>
-
-<div class="dashboard-wrapper">
-    
-    <div class="header-flex">
-        <div>
-            <h2 style="color: #333; margin: 0;">Panel de Control EcoData</h2>
-            <p style="color: #858796; margin: 5px 0 0 0;">Bienvenido de nuevo, <strong>{{ usuario_actual }}</strong></p>
-        </div>
-        <a href="{{ url_for('exportar_ventas') }}" class="btn-excel">
-            <i class="fas fa-file-excel"></i> Exportar Reporte de Ventas
-        </a>
+<!--
+    Propósito:
+    Encabezado principal del dashboard.
+-->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard general</h1>
+        <p class="page-subtitle">
+            Vista ejecutiva del sistema EcoData con indicadores, accesos rápidos y actividad operativa.
+        </p>
     </div>
-
-    {% if alertas %}
-    <div class="alert-container">
-        {% for alerta in alertas %}
-        <div class="alert-item {% if alerta.nivel == 'peligro' %}alert-peligro{% else %}alert-advertencia{% endif %}">
-            <i class="fas {% if alerta.nivel == 'peligro' %}fa-exclamation-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
-            <div>
-                <strong>{{ "ACCIÓN REQUERIDA" if alerta.nivel == 'peligro' else "AVISO SISTEMA" }}:</strong> 
-                {{ alerta.mensaje }}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    <div class="kpi-grid">
-        <div class="kpi-card border-blue">
-            <h3>Materia Prima</h3>
-            <span class="value color-blue">{{ total_kilos }} <small style="font-size: 1rem;">kg</small></span>
-        </div>
-        <div class="kpi-card border-green">
-            <h3>Stock Terminado</h3>
-            <span class="value color-green">{{ total_piezas }} <small style="font-size: 1rem;">pzas</small></span>
-        </div>
-        <div class="kpi-card border-yellow">
-            <h3>Procesos Activos</h3>
-            <span class="value color-yellow">{{ procesos_activos }}</span>
-        </div>
-    </div>
-
-    <div class="kpi-grid">
-        <div class="kpi-card border-red">
-            <h3>Ventas Totales ($)</h3>
-            <span class="value color-red">${{ "{:,.2f}".format(dinero_total) }}</span>
-        </div>
-        <div class="kpi-card border-cyan">
-            <h3>Pedidos Pendientes</h3>
-            <span class="value color-cyan">{{ pedidos_pendientes }}</span>
-        </div>
-    </div>
-
-    <div class="charts-grid">
-        <div class="chart-box chart-full">
-            <h4><i class="fas fa-chart-line"></i> Tendencia de Ingresos (Últimos 7 días)</h4>
-            <canvas id="graficaVentas" style="max-height: 280px;"></canvas>
-        </div>
-
-        <div class="chart-box">
-            <h4><i class="fas fa-barcode"></i> Disponibilidad de Productos</h4>
-            <canvas id="graficaProductos"></canvas>
-        </div>
-
-        <div class="chart-box">
-            <h4><i class="fas fa-pie-chart"></i> Distribución de Metales (kg)</h4>
-            <canvas id="graficaMetales"></canvas>
-        </div>
-    </div>
-
 </div>
 
-<script>
-    // 1. Gráfica de Ventas (Línea)
-    new Chart(document.getElementById('graficaVentas'), {
-        type: 'line',
-        data: {
-            labels: {{ labels_ventas | tojson }},
-            datasets: [{
-                label: 'Ingresos Diarios',
-                data: {{ valores_ventas | tojson }},
-                borderColor: '#e74a3b',
-                backgroundColor: 'rgba(231, 74, 59, 0.1)',
-                fill: true,
-                tension: 0.4,
-                pointRadius: 4,
-                borderWidth: 3
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, grid: { color: '#f8f9fa' } } }
-        }
-    });
+<!--
+    Propósito:
+    Hero principal del dashboard con resumen ejecutivo.
+-->
+<section class="dashboard-hero">
+    <div class="dashboard-hero-inner">
+        <div>
+            <div class="dashboard-hero-badge">
+                <i class="fas fa-sparkles"></i>
+                Sistema central EcoData
+            </div>
 
-    // 2. Gráfica de Productos (Barras)
-    new Chart(document.getElementById('graficaProductos'), {
-        type: 'bar',
-        data: {
-            labels: {{ nombres_prod | tojson }},
-            datasets: [{
-                label: 'Stock Actual',
-                data: {{ cantidades_prod | tojson }},
-                backgroundColor: '#1cc88a',
-                borderRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } }
-        }
-    });
+            <h2>
+                Opera, monitorea y decide desde un solo panel.
+            </h2>
 
-    // 3. Gráfica de Metales (Dona)
-    new Chart(document.getElementById('graficaMetales'), {
-        type: 'doughnut',
-        data: {
-            labels: {{ tipos_metal | tojson }},
-            datasets: [{
-                data: {{ kilos_metal | tojson }},
-                backgroundColor: ['#4e73df', '#f6c23e', '#36b9cc', '#e74a3b', '#858796'],
-                borderWidth: 2,
-                borderColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            cutout: '70%'
-        }
-    });
-</script>
+            <p>
+                Revisa el estado de la logística, inventario, producción, compras y calidad
+                desde una interfaz uniforme, moderna y fácil de usar.
+            </p>
+
+            <div class="dashboard-hero-actions">
+                <a href="/transporte" class="btn btn-primary">
+                    <i class="fas fa-truck-fast"></i>
+                    Ir a logística
+                </a>
+
+                <a href="/embarques" class="btn btn-secondary">
+                    <i class="fas fa-weight-hanging"></i>
+                    Ver embarques
+                </a>
+
+                <a href="/inventario" class="btn btn-secondary">
+                    <i class="fas fa-boxes-stacked"></i>
+                    Ver inventario
+                </a>
+            </div>
+        </div>
+
+        <div class="dashboard-hero-side">
+            <div class="mini-stat-card">
+                <div class="label">Pedidos pendientes</div>
+                <div class="value">{{ s.pedidos_pendientes|default(0, true) }}</div>
+            </div>
+
+            <div class="mini-stat-card">
+                <div class="label">Envíos en tránsito</div>
+                <div class="value">{{ s.envios_transito|default(0, true) }}</div>
+            </div>
+
+            <div class="mini-stat-card">
+                <div class="label">Embarques de hoy</div>
+                <div class="value">{{ s.embarques_hoy|default(0, true) }}</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!--
+    Propósito:
+    KPI superiores del dashboard.
+-->
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Unidades disponibles</div>
+        <div class="kpi-value">{{ s.unidades_disponibles|default(0, true) }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Choferes activos</div>
+        <div class="kpi-value">{{ s.choferes_activos|default(0, true) }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Alertas abiertas</div>
+        <div class="kpi-value">{{ s.alertas_abiertas|default(0, true) }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Compras del mes</div>
+        <div class="kpi-value">{{ s.compras_mes|default(0, true) }}</div>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Tarjetas de acceso rápido por módulo.
+-->
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-grid-2"></i> Módulos principales</h3>
+    </div>
+
+    <div class="card-body">
+        <div class="module-grid">
+            <a href="/inventario" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #2796db 0%, #1f78b2 100%);">
+                    <i class="fas fa-boxes-stacked"></i>
+                </div>
+                <h4>Inventario</h4>
+                <p>Consulta existencias, materiales y movimientos de almacén.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+
+            <a href="/procesos" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #2c9c68 0%, #237d54 100%);">
+                    <i class="fas fa-gears"></i>
+                </div>
+                <h4>Producción</h4>
+                <p>Monitorea procesos, operaciones y control de maquinaria.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+
+            <a href="/transporte" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);">
+                    <i class="fas fa-truck-fast"></i>
+                </div>
+                <h4>Logística</h4>
+                <p>Gestiona despacho, rutas, entregas y seguimiento operativo.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+
+            <a href="/embarques" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">
+                    <i class="fas fa-weight-hanging"></i>
+                </div>
+                <h4>Embarques</h4>
+                <p>Registra pesajes, entradas, salidas y control de báscula.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+
+            <a href="/calidad" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);">
+                    <i class="fas fa-shield-halved"></i>
+                </div>
+                <h4>Calidad</h4>
+                <p>Registra inspecciones, hallazgos e incidencias operativas.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+
+            <a href="/compras" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                    <i class="fas fa-cart-shopping"></i>
+                </div>
+                <h4>Compras</h4>
+                <p>Controla proveedores, adquisiciones y abastecimiento.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+
+            <a href="/clientes" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h4>Clientes</h4>
+                <p>Consulta directorio comercial y relaciones con pedidos o ventas.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+
+            <a href="/personal" class="module-card">
+                <div class="module-icon" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <h4>Personal</h4>
+                <p>Administra personal, áreas, accesos y privilegios del sistema.</p>
+                <span class="go">Abrir módulo <i class="fas fa-arrow-right"></i></span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-3">
+    <!--
+        Propósito:
+        Actividad reciente del sistema.
+    -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-clock-rotate-left"></i> Actividad reciente</h3>
+        </div>
+
+        <div class="card-body">
+            {% if actividad %}
+                <div class="activity-list">
+                    {% for item in actividad %}
+                        <div class="activity-item">
+                            <div
+                                class="activity-icon"
+                                style="background: linear-gradient(135deg, #2796db 0%, #2c9c68 100%);"
+                            >
+                                <i class="fas fa-bolt"></i>
+                            </div>
+
+                            <div class="activity-body">
+                                <strong>{{ item.titulo|default('Movimiento registrado', true) }}</strong>
+                                <span>
+                                    {{ item.descripcion|default('Se registró una acción reciente en el sistema.', true) }}
+                                </span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-timeline"></i>
+                    Aún no hay actividad reciente para mostrar.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!--
+        Propósito:
+        Accesos rápidos operativos.
+    -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-bolt"></i> Accesos rápidos</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="shortcut-list">
+                <a href="/nuevo_pedido" class="shortcut-item">
+                    <div
+                        class="shortcut-icon"
+                        style="background: linear-gradient(135deg, #2796db 0%, #1f78b2 100%);"
+                    >
+                        <i class="fas fa-file-circle-plus"></i>
+                    </div>
+                    <div class="shortcut-body">
+                        <strong>Crear pedido</strong>
+                        <span>Alta rápida de pedidos de venta.</span>
+                    </div>
+                </a>
+
+                <a href="/transporte" class="shortcut-item">
+                    <div
+                        class="shortcut-icon"
+                        style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);"
+                    >
+                        <i class="fas fa-truck-fast"></i>
+                    </div>
+                    <div class="shortcut-body">
+                        <strong>Registrar envío</strong>
+                        <span>Asignación rápida de despacho y entrega.</span>
+                    </div>
+                </a>
+
+                <a href="/embarques" class="shortcut-item">
+                    <div
+                        class="shortcut-icon"
+                        style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);"
+                    >
+                        <i class="fas fa-weight-hanging"></i>
+                    </div>
+                    <div class="shortcut-body">
+                        <strong>Nuevo embarque</strong>
+                        <span>Registro operativo de báscula y pesaje.</span>
+                    </div>
+                </a>
+
+                <a href="/mantenimiento/alertas" class="shortcut-item">
+                    <div
+                        class="shortcut-icon"
+                        style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"
+                    >
+                        <i class="fas fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="shortcut-body">
+                        <strong>Ver alertas</strong>
+                        <span>Consulta incidencias y acciones pendientes.</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!--
+        Propósito:
+        Estado rápido del sistema o módulos.
+    -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-wave-square"></i> Estado del sistema</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="status-list">
+                <div class="status-row">
+                    <div>
+                        <strong>Logística y entregas</strong>
+                        <span>Operación diaria y despacho</span>
+                    </div>
+                    <span class="badge badge-success">Activo</span>
+                </div>
+
+                <div class="status-row">
+                    <div>
+                        <strong>Inventario</strong>
+                        <span>Existencias y materiales</span>
+                    </div>
+                    <span class="badge badge-success">Activo</span>
+                </div>
+
+                <div class="status-row">
+                    <div>
+                        <strong>Calidad</strong>
+                        <span>Inspecciones y reportes</span>
+                    </div>
+                    <span class="badge badge-info">Operando</span>
+                </div>
+
+                <div class="status-row">
+                    <div>
+                        <strong>Mantenimiento</strong>
+                        <span>Alertas y bitácora</span>
+                    </div>
+                    <span class="badge badge-warning">Revisión</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

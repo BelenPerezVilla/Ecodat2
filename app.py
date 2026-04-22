@@ -6,8 +6,8 @@ from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 import os
 from datetime import date
-from datetime import datetime, timedelta
-from sqlalchemy import func
+from datetime import datetime, timedelta, timedelta
+from sqlalchemy import func, or_, cast, String
 from fpdf import FPDF
 from flask import make_response
 from sqlalchemy import func
@@ -21,6 +21,7 @@ from io import BytesIO
 from flask import send_file 
 from functools import wraps
 from flask import session, redirect, url_for, flash 
+from fpdf import FPDF
 
 app = Flask(__name__)
 app.secret_key = 'hola123' # Necesario para las sesiones
@@ -154,105 +155,358 @@ def login():
 
     return render_template('login.html', error=error)
 
+# ==========================================================
+# BLOQUE: Dispatch / mapa logístico
+# Propósito:
+# - Crear y asignar envíos desde el mapa
+# - Aplicar filtros avanzados
+# - Paginar panel de activos e historial
+# - Mostrar resumen rápido operativo
+# ==========================================================
 @app.route('/dispatch', methods=['GET', 'POST'])
 def dispatch_mapa():
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
     if request.method == 'POST':
-        accion = request.form.get('accion')
-        
-        # ACCIÓN 1: Asignar chofer y vehículo a un envío pendiente
-        if accion == 'asignar_envio':
-            envio = Envio.query.get(request.form.get('id_envio'))
-            if envio:
-                envio.id_vehiculo = request.form.get('id_vehiculo')
-                envio.id_chofer = request.form.get('id_chofer')
+        accion = (request.form.get('accion') or '').strip()
+
+        try:
+            # ----------------------------------------------------------
+            # ACCIÓN: Asignar envío pendiente
+            # ----------------------------------------------------------
+            if accion == 'asignar_envio':
+                id_envio = request.form.get('id_envio', type=int)
+                id_vehiculo = request.form.get('id_vehiculo', type=int)
+                id_chofer = request.form.get('id_chofer', type=int)
+
+                if not id_envio or not id_vehiculo or not id_chofer:
+                    flash('Debes seleccionar envío, vehículo y chofer.', 'warning')
+                    return redirect(url_for('dispatch_mapa'))
+
+                envio = Envio.query.get_or_404(id_envio)
+                vehiculo = Vehiculo.query.get_or_404(id_vehiculo)
+                chofer = Chofer.query.get_or_404(id_chofer)
+
+                if envio.estado_entrega != 'Pendiente':
+                    flash('Ese envío ya no está pendiente de asignación.', 'warning')
+                    return redirect(url_for('dispatch_mapa'))
+
+                if vehiculo.estado != 'Disponible':
+                    flash(f'La unidad {vehiculo.placa} ya no está disponible.', 'danger')
+                    return redirect(url_for('dispatch_mapa'))
+
+                otro_envio_activo = Envio.query.filter(
+                    Envio.id_venta == envio.id_venta,
+                    Envio.id_envio != envio.id_envio,
+                    Envio.estado_entrega.in_(['Pendiente', 'En Tránsito'])
+                ).first()
+
+                if otro_envio_activo:
+                    flash(f'La venta #{envio.id_venta} ya tiene otro envío activo.', 'warning')
+                    return redirect(url_for('dispatch_mapa'))
+
+                envio.id_vehiculo = vehiculo.id_vehiculo
+                envio.id_chofer = chofer.id_chofer
                 envio.estado_entrega = 'En Tránsito'
-                
-                vehiculo = Vehiculo.query.get(envio.id_vehiculo)
-                if vehiculo: vehiculo.estado = 'En Ruta'
+
+                if not envio.fecha_salida:
+                    envio.fecha_salida = datetime.now()
+
+                vehiculo.estado = 'En Ruta'
+
                 db.session.commit()
-        
-        # ACCIÓN 2: Crear un nuevo envío desde el mapa
-        elif accion == 'crear_envio':
-            nuevo = Envio(
-                id_venta=request.form.get('id_venta'),
-                destino=request.form.get('destino'),
-                latitud=request.form.get('latitud'),
-                longitud=request.form.get('longitud'),
-                estado_entrega='Pendiente'
-            )
-            db.session.add(nuevo)
-            db.session.commit()
+                flash(f'Envío #{envio.id_envio} asignado correctamente a {chofer.nombre}.', 'success')
+                return redirect(url_for('dispatch_mapa'))
 
-        # ACCIÓN 3: Guardar ubicación en la ficha del Cliente
-        elif accion == 'guardar_ubicacion_cliente':
-            cliente = Cliente.query.get(request.form.get('id_cliente'))
-            if cliente:
-                cliente.latitud = request.form.get('lat')
-                cliente.longitud = request.form.get('lng')
+            # ----------------------------------------------------------
+            # ACCIÓN: Crear envío pendiente
+            # ----------------------------------------------------------
+            elif accion == 'crear_envio':
+                id_venta = request.form.get('id_venta', type=int)
+                destino = (request.form.get('destino') or '').strip()
+                latitud = request.form.get('latitud', type=float)
+                longitud = request.form.get('longitud', type=float)
+
+                if not id_venta or not destino:
+                    flash('Debes indicar la venta y el destino para crear el envío.', 'warning')
+                    return redirect(url_for('dispatch_mapa'))
+
+                venta = Venta.query.get(id_venta)
+                if not venta:
+                    flash(f'La venta #{id_venta} no existe.', 'danger')
+                    return redirect(url_for('dispatch_mapa'))
+
+                if venta_tiene_envio_activo(id_venta):
+                    flash(f'La venta #{id_venta} ya tiene un envío activo.', 'warning')
+                    return redirect(url_for('dispatch_mapa'))
+
+                if (latitud is None or longitud is None) and getattr(venta, 'cliente', None):
+                    latitud = venta.cliente.latitud
+                    longitud = venta.cliente.longitud
+
+                nuevo_envio = Envio(
+                    id_venta=venta.id_venta,
+                    destino=destino,
+                    latitud=latitud,
+                    longitud=longitud,
+                    estado_entrega='Pendiente'
+                )
+
+                db.session.add(nuevo_envio)
                 db.session.commit()
-        if accion == 'guardar_ubicacion_almacen':
-            almacen = Almacen.query.get(request.form.get('id_almacen'))
-            if almacen:
-                almacen.latitud = request.form.get('lat')
-                almacen.longitud = request.form.get('lng')
+
+                flash(f'Envío pendiente creado para la venta #{venta.id_venta}.', 'success')
+                return redirect(url_for('dispatch_mapa'))
+
+            # ----------------------------------------------------------
+            # ACCIÓN: Guardar ubicación del cliente
+            # ----------------------------------------------------------
+            elif accion == 'guardar_ubicacion_cliente':
+                id_cliente = request.form.get('id_cliente', type=int)
+                lat = request.form.get('lat', type=float)
+                lng = request.form.get('lng', type=float)
+
+                if not id_cliente or lat is None or lng is None:
+                    flash('No fue posible guardar la ubicación del cliente.', 'warning')
+                    return redirect(url_for('dispatch_mapa'))
+
+                cliente = Cliente.query.get_or_404(id_cliente)
+                cliente.latitud = lat
+                cliente.longitud = lng
+
                 db.session.commit()
-                
-        return redirect(url_for('dispatch_mapa'))
+                flash(f'Ubicación guardada para el cliente {cliente.empresa}.', 'success')
+                return redirect(url_for('dispatch_mapa'))
 
-    # Datos para la vista
-    almacenes = Almacen.query.all()
-    clientes = Cliente.query.all()
-    pendientes = Envio.query.filter_by(estado_entrega='Pendiente').all()
-    activos = Envio.query.filter_by(estado_entrega='En Tránsito').all()
-    vehiculos = Vehiculo.query.filter_by(estado='Disponible').all()
-    choferes = Chofer.query.all()
-    historial = Envio.query.filter_by(estado_entrega='Entregado').order_by(Envio.id_envio.desc()).limit(10).all()
-    
-    return render_template('dispatch.html', 
-                           clientes=clientes, 
-                           pendientes=pendientes, 
-                           activos=activos, 
-                           vehiculos=vehiculos, 
-                           choferes=choferes,
-                           almacenes=almacenes,
-                           historial=historial)
+            # ----------------------------------------------------------
+            # ACCIÓN: Guardar ubicación del almacén
+            # ----------------------------------------------------------
+            elif accion == 'guardar_ubicacion_almacen':
+                id_almacen = request.form.get('id_almacen', type=int)
+                lat = request.form.get('lat', type=float)
+                lng = request.form.get('lng', type=float)
 
+                if not id_almacen or lat is None or lng is None:
+                    flash('No fue posible guardar la ubicación del almacén.', 'warning')
+                    return redirect(url_for('dispatch_mapa'))
 
-@app.route('/completar_envio/<int:id>', methods=['POST'])
-def completar_envio(id):
-    envio = Envio.query.get(id)
-    if envio:
-        envio.estado_entrega = 'Entregado'
-        # Liberar el vehículo
-        vehiculo = Vehiculo.query.get(envio.id_vehiculo)
-        if vehiculo: vehiculo.estado = 'Disponible'
-        db.session.commit()
-    return redirect(url_for('dispatch_mapa'))
+                almacen = Almacen.query.get_or_404(id_almacen)
+                almacen.latitud = lat
+                almacen.longitud = lng
 
-@app.route('/areas', methods=['GET', 'POST'])
-def gestion_areas():
-    if request.method == 'POST':
-        # Recibimos el nombre del área desde el formulario
-        nombre = request.form.get('nombre_area')
-        
-        if nombre:
-            # Guardamos la nueva área en la base de datos
-            nueva_area = Area(nombre_area=nombre)
-            db.session.add(nueva_area)
-            
-            try:
                 db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                return f"Error al guardar el área: {e}"
-                
-        # Recargamos la página limpia
-        return redirect(url_for('gestion_areas'))
-    
-    # Si es GET, traemos todas las áreas para mostrarlas en la tabla
-    todas_las_areas = Area.query.all()
-    return render_template('areas.html', areas=todas_las_areas)
+                flash(f'Ubicación guardada para el almacén {almacen.nombre_almacen}.', 'success')
+                return redirect(url_for('dispatch_mapa'))
 
+            else:
+                flash('La acción solicitada no es válida.', 'danger')
+                return redirect(url_for('dispatch_mapa'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al procesar la operación de rutas: {str(e)}', 'danger')
+            return redirect(url_for('dispatch_mapa'))
+
+    # ==========================================================
+    # FILTROS DEL MÓDULO
+    # ==========================================================
+    filtro_q = (request.args.get('q') or '').strip()
+    filtro_vista = (request.args.get('vista') or 'todos').strip()
+    filtro_fecha_inicio = (request.args.get('fecha_inicio') or '').strip()
+    filtro_fecha_fin = (request.args.get('fecha_fin') or '').strip()
+    filtro_id_chofer = request.args.get('id_chofer_filtro', type=int)
+    filtro_id_vehiculo = request.args.get('id_vehiculo_filtro', type=int)
+    pagina_activos = request.args.get('page_activos', 1, type=int)
+    pagina_historial = request.args.get('page_historial', 1, type=int)
+
+    # Catálogos base.
+    almacenes = Almacen.query.order_by(Almacen.nombre_almacen.asc()).all()
+    clientes = Cliente.query.order_by(Cliente.empresa.asc()).all()
+    vehiculos_disponibles = Vehiculo.query.filter_by(estado='Disponible').order_by(Vehiculo.placa.asc()).all()
+    vehiculos_filtro = Vehiculo.query.order_by(Vehiculo.placa.asc()).all()
+    choferes = Chofer.query.order_by(Chofer.nombre.asc()).all()
+
+    # Conteos globales.
+    total_pendientes = Envio.query.filter_by(estado_entrega='Pendiente').count()
+    total_activos = Envio.query.filter_by(estado_entrega='En Tránsito').count()
+    total_historial = Envio.query.filter_by(estado_entrega='Entregado').count()
+
+    # Consultas base.
+    query_pendientes = Envio.query.filter_by(estado_entrega='Pendiente')
+    query_activos = Envio.query.filter_by(estado_entrega='En Tránsito')
+    query_historial = Envio.query.filter_by(estado_entrega='Entregado')
+
+    # Aplicación de filtros.
+    query_pendientes = aplicar_filtros_envios(
+        query=query_pendientes,
+        texto_busqueda=filtro_q,
+        fecha_inicio=filtro_fecha_inicio,
+        fecha_fin=filtro_fecha_fin,
+        id_chofer=filtro_id_chofer,
+        id_vehiculo=filtro_id_vehiculo
+    ).order_by(Envio.id_envio.desc())
+
+    query_activos = aplicar_filtros_envios(
+        query=query_activos,
+        texto_busqueda=filtro_q,
+        fecha_inicio=filtro_fecha_inicio,
+        fecha_fin=filtro_fecha_fin,
+        id_chofer=filtro_id_chofer,
+        id_vehiculo=filtro_id_vehiculo
+    ).order_by(Envio.fecha_salida.desc(), Envio.id_envio.desc())
+
+    query_historial = aplicar_filtros_envios(
+        query=query_historial,
+        texto_busqueda=filtro_q,
+        fecha_inicio=filtro_fecha_inicio,
+        fecha_fin=filtro_fecha_fin,
+        id_chofer=filtro_id_chofer,
+        id_vehiculo=filtro_id_vehiculo
+    ).order_by(Envio.fecha_salida.desc(), Envio.id_envio.desc())
+
+    # Datos completos para el mapa.
+    pendientes = query_pendientes.all()
+    activos_mapa = query_activos.all()
+
+    # Paginación para panel lateral y tabla de historial.
+    paginacion_activos = paginar_query(query_activos, page=pagina_activos, per_page=5)
+    activos_panel = paginacion_activos['items']
+
+    paginacion_historial = paginar_query(query_historial, page=pagina_historial, per_page=10)
+    historial = paginacion_historial['items']
+
+    # Filtro visual por vista.
+    if filtro_vista == 'pendientes':
+        activos_mapa = []
+        activos_panel = []
+        historial = []
+    elif filtro_vista == 'activos':
+        pendientes = []
+        historial = []
+    elif filtro_vista == 'historial':
+        pendientes = []
+        activos_mapa = []
+        activos_panel = []
+
+    # Resumen rápido.
+    resumen_choferes, resumen_vehiculos = obtener_resumen_operativo_envios()
+
+    return render_template(
+        'dispatch.html',
+        clientes=clientes,
+        pendientes=pendientes,
+        activos=activos_mapa,
+        activos_panel=activos_panel,
+        historial=historial,
+        choferes=choferes,
+        vehiculos_disponibles=vehiculos_disponibles,
+        vehiculos_filtro=vehiculos_filtro,
+        almacenes=almacenes,
+        total_pendientes=total_pendientes,
+        total_activos=total_activos,
+        total_historial=total_historial,
+        filtro_q=filtro_q,
+        filtro_vista=filtro_vista,
+        filtro_fecha_inicio=filtro_fecha_inicio,
+        filtro_fecha_fin=filtro_fecha_fin,
+        filtro_id_chofer=filtro_id_chofer,
+        filtro_id_vehiculo=filtro_id_vehiculo,
+        pagina_activos=paginacion_activos['page'],
+        total_paginas_activos=paginacion_activos['total_pages'],
+        total_filtrados_activos=paginacion_activos['total'],
+        tiene_anterior_activos=paginacion_activos['has_prev'],
+        tiene_siguiente_activos=paginacion_activos['has_next'],
+        pagina_historial=paginacion_historial['page'],
+        total_paginas_historial=paginacion_historial['total_pages'],
+        total_filtrados_historial=paginacion_historial['total'],
+        tiene_anterior_historial=paginacion_historial['has_prev'],
+        tiene_siguiente_historial=paginacion_historial['has_next'],
+        resumen_choferes=resumen_choferes,
+        resumen_vehiculos=resumen_vehiculos
+    )
+
+
+# ==========================================================
+# FUNCIONES AUXILIARES: Paginación y resumen operativo
+# Propósito:
+# - Paginar consultas de envíos
+# - Obtener resumen rápido por chofer y vehículo
+# ==========================================================
+
+def paginar_query(query, page=1, per_page=10):
+    """
+    Pagina una consulta SQLAlchemy sin depender de helpers externos.
+    """
+    # Se normalizan valores para evitar páginas inválidas.
+    page = page or 1
+    per_page = per_page or 10
+
+    if page < 1:
+        page = 1
+
+    if per_page < 1:
+        per_page = 10
+
+    # Se obtiene el total sin el order_by para evitar conteos innecesariamente pesados.
+    total = query.order_by(None).count()
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    # Si la página pedida supera el total, se ajusta a la última.
+    if page > total_pages:
+        page = total_pages
+
+    offset = (page - 1) * per_page
+    items = query.offset(offset).limit(per_page).all()
+
+    return {
+        'items': items,
+        'page': page,
+        'per_page': per_page,
+        'total': total,
+        'total_pages': total_pages,
+        'has_prev': page > 1,
+        'has_next': page < total_pages
+    }
+
+
+def obtener_resumen_operativo_envios():
+    """
+    Obtiene resumen rápido de envíos activos por chofer y por vehículo.
+    """
+    # Resumen de choferes con más envíos en tránsito.
+    resumen_choferes = (
+        db.session.query(
+            Chofer.id_chofer,
+            Chofer.nombre,
+            func.count(Envio.id_envio).label('total')
+        )
+        .join(Envio, Envio.id_chofer == Chofer.id_chofer)
+        .filter(Envio.estado_entrega == 'En Tránsito')
+        .group_by(Chofer.id_chofer, Chofer.nombre)
+        .order_by(func.count(Envio.id_envio).desc(), Chofer.nombre.asc())
+        .limit(5)
+        .all()
+    )
+
+    # Resumen de vehículos con más envíos en tránsito.
+    resumen_vehiculos = (
+        db.session.query(
+            Vehiculo.id_vehiculo,
+            Vehiculo.placa,
+            Vehiculo.modelo,
+            func.count(Envio.id_envio).label('total')
+        )
+        .join(Envio, Envio.id_vehiculo == Vehiculo.id_vehiculo)
+        .filter(Envio.estado_entrega == 'En Tránsito')
+        .group_by(Vehiculo.id_vehiculo, Vehiculo.placa, Vehiculo.modelo)
+        .order_by(func.count(Envio.id_envio).desc(), Vehiculo.placa.asc())
+        .limit(5)
+        .all()
+    )
+
+    return resumen_choferes, resumen_vehiculos
 
 @app.route('/personal', methods=['GET', 'POST'])
 def personal():
@@ -1253,427 +1507,1030 @@ def reportes_calidad():
     return render_template('reportes_calidad.html', historial=historial)
 
 
-@app.route('/transporte', methods=['GET', 'POST'])
-def transporte():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
-    if request.method == 'POST':
-        nuevo_envio = Envio(
-            id_venta=request.form['id_venta'],
-            id_vehiculo=request.form['id_vehiculo'],
-            id_chofer=request.form['id_chofer'],
-            destino=request.form['destino']
-        )
-        db.session.add(nuevo_envio)
-        
-        # Actualizamos el estado del vehículo a 'En Ruta'
-        vehiculo = Vehiculo.query.get(request.form['id_vehiculo'])
-        vehiculo.estado = 'En Ruta'
-        
-        db.session.commit()
-        return redirect(url_for('transporte'))
-
-    envios = Envio.query.order_by(Envio.id_envio.desc()).all()
-    ventas_pendientes = Venta.query.all() # Aquí podrías filtrar las que no tienen envío aún
-    vehiculos = Vehiculo.query.filter_by(estado='Disponible').all()
-    choferes = Chofer.query.all()
-    
-    return render_template('transporte.html', envios=envios, ventas=ventas_pendientes, vehiculos=vehiculos, choferes=choferes)
-
-@app.route('/vehiculos', methods=['GET', 'POST'])
-def vehiculos():
-    if request.method == 'POST':
-        nuevo = Vehiculo(placa=request.form['placa'], modelo=request.form['modelo'], capacidad_kg=request.form['capacidad'])
-        db.session.add(nuevo)
-        db.session.commit()
-        return redirect(url_for('vehiculos'))
-    lista = Vehiculo.query.all()
-    return render_template('vehiculos.html', vehiculos=lista)
-
-@app.route('/embarques', methods=['GET', 'POST'])
-def embarques():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
-    if request.method == 'POST':
-        peso_bruto = float(request.form['peso_bruto'])
-        peso_tara = float(request.form['peso_tara'])
-        peso_neto = peso_bruto - peso_tara
-        
-        tipo_mov = request.form['tipo_movimiento']
-        tipo_metal_ingresado = request.form['tipo_metal']
-
-        nuevo_embarque = Embarque(
-            tipo_movimiento=tipo_mov,
-            placas=request.form['placas'], # Viene del menú desplegable
-            chofer=request.form['chofer'],
-            origen_destino=request.form['origen_destino'],
-            tipo_metal=tipo_metal_ingresado,
-            peso_bruto_kg=peso_bruto,
-            peso_tara_kg=peso_tara,
-            peso_neto_kg=peso_neto,
-            fecha_registro=datetime.now()
-        )
-        db.session.add(nuevo_embarque)
-
-        # --- MAGIA DEL ERP: AUTOMATIZACIÓN DE INVENTARIO ---
-        if tipo_mov == 'Entrada':
-            # Buscamos si ya existe el metal en el inventario
-            inventario = InventarioMetal.query.filter_by(tipo_metal=tipo_metal_ingresado).first()
-            
-            if inventario:
-                # Si existe, sumamos los kilos
-                inventario.cantidad_kg += peso_neto
-            else:
-                # Si es nuevo, creamos el registro (usando Almacen 1 y Proveedor 1 por defecto)
-                nuevo_inventario = InventarioMetal(
-                    id_almacen=1,       
-                    id_proveedor=1,     
-                    tipo_metal=tipo_metal_ingresado,
-                    cantidad_kg=peso_neto,
-                    fecha_entrada=date.today()
-                )
-                db.session.add(nuevo_inventario)
-        # ----------------------------------------------------
-        
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return f"Error al registrar el embarque o actualizar inventario: {e}"
-            
-        return redirect(url_for('embarques'))
-
-    # Para cargar la página (GET)
-    # 1. Traemos el historial de embarques
-    lista_embarques = Embarque.query.order_by(Embarque.fecha_registro.desc()).all()
-    
-    # 2. Traemos los catálogos para los menús desplegables
-    vehiculos = Vehiculo.query.all()
-    proveedores = Proveedor.query.all()
-    clientes = Cliente.query.all()
-    lista_choferes = Chofer.query.all()
-    
-    # 3. TRUCO: Sacamos una lista de los metales que ya existen en tu inventario para no duplicarlos
-    metales_unicos = db.session.query(InventarioMetal.tipo_metal).distinct().all()
-    lista_metales = [m[0] for m in metales_unicos] # Lo convierte en una lista fácil de leer
-    
-    # Asegúrate de enviar todas estas variables al HTML
-    return render_template('embarques.html', 
-                           embarques=lista_embarques, 
-                           vehiculos=vehiculos,
-                           proveedores=proveedores,
-                           clientes=clientes,
-                           choferes=lista_choferes,
-                           metales=lista_metales)
-
-
-
-
-@app.route('/choferes', methods=['GET', 'POST'])
-def choferes():
-    if request.method == 'POST':
-        nuevo = Chofer(nombre=request.form['nombre'], licencia=request.form['licencia'], telefono=request.form['telefono'])
-        db.session.add(nuevo)
-        db.session.commit()
-        return redirect(url_for('choferes'))
-    lista = Chofer.query.all()
-    return render_template('choferes.html', choferes=lista)
-
-@app.route('/entregar/<int:id_envio>', methods=['POST'])
-def finalizar_entrega(id_envio):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
-    # 1. Buscamos el envío en la base de datos
-    envio = Envio.query.get_or_404(id_envio)
-
-    if envio.estado_entrega != 'Entregado':
-        # 2. Marcamos el envío como completado
-        envio.estado_entrega = 'Entregado'
-        
-        # 3. Buscamos el vehículo asociado y lo liberamos
-        vehiculo = Vehiculo.query.get(envio.id_vehiculo)
-        if vehiculo:
-            vehiculo.estado = 'Disponible'
-        
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return f"Error al procesar la entrega: {e}"
-
-    return redirect(url_for('transporte'))
-
-
-@app.route('/imprimir_vale/<int:id_envio>')
-def imprimir_vale(id_envio):
-    envio = Envio.query.get_or_404(id_envio)
-    
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Encabezado
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "ECODATA - VALE DE SALIDA DE MATERIAL", 0, 1, 'C')
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(0, 10, f"Fecha: {envio.fecha_salida.strftime('%d/%m/%Y %H:%M')}", 0, 1, 'R')
-    pdf.ln(5)
-    
-    # Datos del Envío
-    pdf.set_fill_color(240, 240, 240)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, f" Guia de Despacho: #ENV-{envio.id_envio}", 1, 1, 'L', True)
-    
-    pdf.set_font("Arial", '', 11)
-    pdf.ln(5)
-    pdf.cell(0, 8, f"Cliente: {envio.venta.cliente. nombre_contacto}", 0, 1)
-    pdf.cell(0, 8, f"Destino: {envio.destino}", 0, 1)
-    pdf.ln(5)
-    
-    # Datos de Transporte
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 10, "DATOS DEL TRANSPORTE", 0, 1)
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(95, 8, f"Vehiculo: {envio.vehiculo.modelo}", 1)
-    pdf.cell(95, 8, f"Placa: {envio.vehiculo.placa}", 1, 1)
-    pdf.cell(190, 8, f"Chofer: {envio.chofer.nombre}", 1, 1)
-    
-    pdf.ln(20)
-    
-    # Firmas
-    pdf.cell(95, 10, "__________________________", 0, 0, 'C')
-    pdf.cell(95, 10, "__________________________", 0, 1, 'C')
-    pdf.cell(95, 10, "Firma Despacho EcoData", 0, 0, 'C')
-    pdf.cell(95, 10, "Firma de Recibido Cliente", 0, 1, 'C')
-
-    response = make_response(pdf.output(dest='S').encode('latin-1'))
-    response.headers.set('Content-Disposition', 'attachment', filename=f'Vale_{envio.id_envio}.pdf')
-    response.headers.set('Content-Type', 'application/pdf')
-    return response
+# ==========================================================
+# BLOQUE: Reciclaje y fundición
+# Propósito:
+# - Mostrar la vista de reciclaje
+# - Registrar nuevos lotes
+# - Finalizar procesos con peso de salida
+# - Calcular merma automáticamente
+# ==========================================================
 
 @app.route('/reciclaje', methods=['GET', 'POST'])
 def reciclaje():
+    # Validación de sesión para proteger el módulo.
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        nuevo_lote = ProcesoReciclaje(
-            lote=request.form['lote'],
-            metal_origen=request.form['metal_origen'],
-            peso_entrada_kg=float(request.form['peso_entrada']),
-            id_maquina=request.form['id_maquina']
-        )
-        db.session.add(nuevo_lote)
-        
-        # Opcional: Aquí podrías restar el peso_entrada del Inventario de chatarra
-        
-        db.session.commit()
+        # Se leen los datos exactamente con los nombres que usa tu HTML.
+        lote = (request.form.get('lote') or '').strip()
+        metal_origen = (request.form.get('metal_origen') or '').strip()
+        peso_entrada = request.form.get('peso_entrada', type=float)
+        id_maquina = request.form.get('id_maquina', type=int)
+
+        # Validaciones básicas del formulario.
+        if not lote or not metal_origen or peso_entrada is None or not id_maquina:
+            flash('Completa todos los campos del proceso de reciclaje.', 'warning')
+            return redirect(url_for('reciclaje'))
+
+        if peso_entrada <= 0:
+            flash('El peso de entrada debe ser mayor a cero.', 'warning')
+            return redirect(url_for('reciclaje'))
+
+        # Se valida que la máquina exista.
+        maquina = Maquina.query.get_or_404(id_maquina)
+
+        try:
+            # Se crea el lote de reciclaje.
+            # IMPORTANTE:
+            # Aquí se respetan los nombres de campos que usa tu plantilla:
+            # lote, metal_origen, peso_entrada_kg, id_maquina, estado
+            nuevo_proceso = ProcesoReciclaje(
+                lote=lote,
+                metal_origen=metal_origen,
+                peso_entrada_kg=peso_entrada,
+                id_maquina=id_maquina,
+                estado='En proceso'
+            )
+
+            db.session.add(nuevo_proceso)
+            db.session.commit()
+
+            flash(f'Lote {lote} registrado correctamente.', 'success')
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'No fue posible registrar el lote: {str(e)}', 'danger')
+
         return redirect(url_for('reciclaje'))
 
-    procesos = ProcesoReciclaje.query.order_by(ProcesoReciclaje.fecha_inicio.desc()).all()
-    maquinas = Maquina.query.all() # Traemos las máquinas/hornos disponibles
-    
-    return render_template('reciclaje.html', procesos=procesos, maquinas=maquinas)
+    # Se cargan máquinas y procesos para la vista.
+    maquinas = Maquina.query.order_by(Maquina.nombre.asc()).all()
+    procesos = ProcesoReciclaje.query.order_by(ProcesoReciclaje.id_proceso.desc()).all()
+
+    return render_template(
+        'reciclaje.html',
+        maquinas=maquinas,
+        procesos=procesos
+    )
 
 
+# ==========================================================
+# BLOQUE: Finalizar reciclaje
+# Propósito:
+# - Registrar peso final del lote
+# - Calcular merma
+# - Marcar el proceso como completado
+# ==========================================================
 @app.route('/finalizar_reciclaje/<int:id_proceso>', methods=['POST'])
 def finalizar_reciclaje(id_proceso):
+    # Validación de sesión para proteger el módulo.
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
     proceso = ProcesoReciclaje.query.get_or_404(id_proceso)
-    
-    if proceso.estado != 'Completado':
-        peso_salida = float(request.form['peso_salida'])
+
+    # Se toma el peso de salida enviado desde el formulario.
+    peso_salida = request.form.get('peso_salida', type=float)
+
+    # Validaciones básicas.
+    if peso_salida is None:
+        flash('Debes capturar el peso de salida.', 'warning')
+        return redirect(url_for('reciclaje'))
+
+    if peso_salida <= 0:
+        flash('El peso de salida debe ser mayor a cero.', 'warning')
+        return redirect(url_for('reciclaje'))
+
+    if peso_salida > proceso.peso_entrada_kg:
+        flash('El peso de salida no puede ser mayor al peso de entrada.', 'danger')
+        return redirect(url_for('reciclaje'))
+
+    try:
+        # Se actualiza el proceso respetando los nombres de campos esperados en la vista.
         proceso.peso_salida_kg = peso_salida
-        
-        # Calculamos la merma
         proceso.merma_kg = proceso.peso_entrada_kg - peso_salida
         proceso.estado = 'Completado'
-        proceso.fecha_fin = datetime.now()
-        
-        # --- INTEGRACIÓN CON INVENTARIO ---
-        # 1. Buscamos si ya existe ese metal
-        inventario = InventarioMetal.query.filter_by(tipo_metal=proceso.metal_origen).first()
-        
-        if inventario:
-            # 2A. Si ya existe, simplemente le sumamos los kilos limpios
-            inventario.cantidad_kg += peso_salida
-        else:
-            # 2B. Si no existe, lo creamos. 
-            # NOTA: Usamos id_almacen=1 e id_proveedor=1 por defecto para evitar errores.
-            nuevo_inventario = InventarioMetal(
-                id_almacen=1,       # Se asigna al Almacén Principal (Asegúrate de que exista el ID 1)
-                id_proveedor=1,     # Se asigna a un Proveedor Genérico/Interno (Asegúrate de que exista el ID 1)
-                tipo_metal=proceso.metal_origen,
-                cantidad_kg=peso_salida,
-                fecha_entrada=date.today()
-            )
-            db.session.add(nuevo_inventario)
-        # -----------------------------------
-        
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return f"Hubo un error al guardar o actualizar el inventario: {e}"
-            
+
+        db.session.commit()
+
+        flash(
+            f'Proceso {proceso.lote} finalizado. Merma calculada: {proceso.merma_kg:.2f} kg.',
+            'success'
+        )
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'No fue posible finalizar el proceso: {str(e)}', 'danger')
+
     return redirect(url_for('reciclaje'))
 
-@app.route('/exportar_inventario')
-def exportar_inventario():
+# ==========================================================
+# BLOQUE: Logística, transporte, embarques y pedidos
+# Propósito:
+# - Mejorar validaciones del módulo
+# - Evitar envíos duplicados
+# - Corregir altas/bajas de items en pedidos
+# - Corregir embarques y pesos de báscula
+# ==========================================================
+
+# Función auxiliar para recalcular el total del pedido.
+# Esto evita que el total quede desfasado al agregar o eliminar productos.
+def recalcular_total_pedido(pedido):
+    pedido.total = sum(
+        (item.cantidad or 0) * (item.precio_unitario or 0)
+        for item in pedido.detalles
+    )
+def obtener_ids_ventas_con_envio_activo():
+    """
+    Obtiene los IDs de ventas que tienen un envío todavía activo.
+    Se consideran activos los estados:
+    - Pendiente
+    - En Tránsito
+    """
+    filas = db.session.query(Envio.id_venta).filter(
+        Envio.id_venta.isnot(None),
+        Envio.estado_entrega.in_(['Pendiente', 'En Tránsito'])
+    ).all()
+
+    return [fila[0] for fila in filas if fila[0] is not None]
+
+# ==========================================================
+# FUNCIÓN AUXILIAR: Aplicar filtros a envíos
+# Propósito:
+# - Filtrar por texto libre
+# - Filtrar por fecha de salida
+# - Filtrar por chofer y vehículo
+# - Reutilizar lógica entre transporte y dispatch
+# ==========================================================
+def aplicar_filtros_envios(
+    query,
+    texto_busqueda='',
+    fecha_inicio='',
+    fecha_fin='',
+    id_chofer=None,
+    id_vehiculo=None
+):
+    # Se agregan joins para poder buscar por nombre de chofer y placa.
+    query = query.outerjoin(Chofer, Envio.id_chofer == Chofer.id_chofer)
+    query = query.outerjoin(Vehiculo, Envio.id_vehiculo == Vehiculo.id_vehiculo)
+
+    # ----------------------------------------------------------
+    # FILTRO 1: Búsqueda libre
+    # ----------------------------------------------------------
+    if texto_busqueda:
+        patron = f"%{texto_busqueda.strip()}%"
+
+        query = query.filter(
+            or_(
+                cast(Envio.id_envio, String).ilike(patron),
+                cast(Envio.id_venta, String).ilike(patron),
+                Envio.destino.ilike(patron),
+                Chofer.nombre.ilike(patron),
+                Vehiculo.placa.ilike(patron)
+            )
+        )
+
+    # ----------------------------------------------------------
+    # FILTRO 2: Fecha inicial
+    # ----------------------------------------------------------
+    if fecha_inicio:
+        try:
+            fecha_inicio_dt = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+            query = query.filter(Envio.fecha_salida >= fecha_inicio_dt)
+        except ValueError:
+            pass
+
+    # ----------------------------------------------------------
+    # FILTRO 3: Fecha final
+    # Se suma un día para incluir todo el día final seleccionado.
+    # ----------------------------------------------------------
+    if fecha_fin:
+        try:
+            fecha_fin_dt = datetime.strptime(fecha_fin, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Envio.fecha_salida < fecha_fin_dt)
+        except ValueError:
+            pass
+
+    # ----------------------------------------------------------
+    # FILTRO 4: Chofer
+    # ----------------------------------------------------------
+    if id_chofer:
+        query = query.filter(Envio.id_chofer == id_chofer)
+
+    # ----------------------------------------------------------
+    # FILTRO 5: Vehículo
+    # ----------------------------------------------------------
+    if id_vehiculo:
+        query = query.filter(Envio.id_vehiculo == id_vehiculo)
+
+    return query
+
+def venta_tiene_envio_activo(id_venta):
+    """
+    Indica si una venta ya tiene un envío activo.
+    """
+    envio = Envio.query.filter(
+        Envio.id_venta == id_venta,
+        Envio.estado_entrega.in_(['Pendiente', 'En Tránsito'])
+    ).first()
+
+    return envio is not None
+
+
+def liberar_vehiculo_de_envio(envio):
+    """
+    Libera el vehículo asociado a un envío, dejándolo disponible nuevamente.
+    """
+    if not envio or not envio.id_vehiculo:
+        return
+
+    vehiculo = Vehiculo.query.get(envio.id_vehiculo)
+    if vehiculo:
+        vehiculo.estado = 'Disponible'
+
+
+def marcar_envio_como_entregado(envio):
+    """
+    Marca un envío como entregado y libera su vehículo.
+    """
+    if not envio:
+        return
+
+    envio.estado_entrega = 'Entregado'
+    liberar_vehiculo_de_envio(envio)
+
+# ==========================================================
+# BLOQUE: Transporte
+# Propósito:
+# - Registrar envíos directos
+# - Mantener sincronía con dispatch
+# - Aplicar filtros avanzados
+# - Paginar resultados
+# - Mostrar resumen rápido operativo
+# ==========================================================
+@app.route('/transporte', methods=['GET', 'POST'])
+def transporte():
+    # Validación de sesión para proteger el módulo.
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
-    # 1. Traemos todo el inventario de la base de datos
-    registros = InventarioMetal.query.order_by(InventarioMetal.fecha_entrada.desc()).all()
+    if request.method == 'POST':
+        # Se leen los datos del formulario.
+        id_venta = request.form.get('id_venta', type=int)
+        id_vehiculo = request.form.get('id_vehiculo', type=int)
+        id_chofer = request.form.get('id_chofer', type=int)
+        destino = (request.form.get('destino') or '').strip()
 
-    # 2. Creamos un archivo en la memoria del servidor
-    si = io.StringIO()
-    cw = csv.writer(si)
+        # Validación básica.
+        if not id_venta or not id_vehiculo or not id_chofer or not destino:
+            flash('Completa todos los campos para registrar el envío.', 'warning')
+            return redirect(url_for('transporte'))
 
-    # 3. Escribimos la primera fila (Los Encabezados)
-    cw.writerow(['Folio Lote', 'Tipo de Metal', 'Cantidad (KG)', 'ID Almacen', 'ID Proveedor', 'Fecha de Entrada'])
+        venta = Venta.query.get_or_404(id_venta)
+        vehiculo = Vehiculo.query.get_or_404(id_vehiculo)
+        chofer = Chofer.query.get_or_404(id_chofer)
 
-    # 4. Recorremos los registros y escribimos fila por fila
-    for r in registros:
-        cw.writerow([
-            f"INV-{r.id_inventario_m}",
-            r.tipo_metal,
-            r.cantidad_kg,
-            r.id_almacen,
-            r.id_proveedor,
-            r.fecha_entrada.strftime('%d/%m/%Y')
-        ])
+        # Regla: una venta no puede tener más de un envío activo.
+        if venta_tiene_envio_activo(id_venta):
+            flash(f'La venta #{venta.id_venta} ya tiene un envío activo.', 'warning')
+            return redirect(url_for('transporte'))
 
-    # 5. Preparamos la respuesta para que el navegador descargue el archivo
-    # El "\ufeff" es un truco (BOM) para que Excel reconozca los acentos y las ñ correctamente
-    output = make_response("\ufeff" + si.getvalue())
-    output.headers["Content-Disposition"] = "attachment; filename=Inventario_EcoData.csv"
-    output.headers["Content-type"] = "text/csv; charset=utf-8"
-    
-    return output
+        # El vehículo debe estar disponible.
+        if vehiculo.estado != 'Disponible':
+            flash(f'La unidad {vehiculo.placa} ya no está disponible.', 'danger')
+            return redirect(url_for('transporte'))
+
+        try:
+            # Se intenta tomar la ubicación del cliente para que el envío aparezca en el mapa.
+            latitud = None
+            longitud = None
+
+            if getattr(venta, 'cliente', None):
+                latitud = venta.cliente.latitud
+                longitud = venta.cliente.longitud
+
+            # Se crea el envío ya en tránsito.
+            nuevo_envio = Envio(
+                id_venta=venta.id_venta,
+                id_vehiculo=vehiculo.id_vehiculo,
+                id_chofer=chofer.id_chofer,
+                destino=destino,
+                latitud=latitud,
+                longitud=longitud,
+                estado_entrega='En Tránsito',
+                fecha_salida=datetime.now()
+            )
+
+            db.session.add(nuevo_envio)
+            vehiculo.estado = 'En Ruta'
+
+            db.session.commit()
+            flash(f'Envío registrado correctamente para la venta #{venta.id_venta}.', 'success')
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'No fue posible registrar el envío: {str(e)}', 'danger')
+
+        return redirect(url_for('transporte'))
+
+    # ==========================================================
+    # FILTROS DEL MÓDULO
+    # ==========================================================
+    filtro_q = (request.args.get('q') or '').strip()
+    filtro_estado = (request.args.get('estado') or 'todos').strip()
+    filtro_fecha_inicio = (request.args.get('fecha_inicio') or '').strip()
+    filtro_fecha_fin = (request.args.get('fecha_fin') or '').strip()
+    filtro_id_chofer = request.args.get('id_chofer_filtro', type=int)
+    filtro_id_vehiculo = request.args.get('id_vehiculo_filtro', type=int)
+    pagina_envios = request.args.get('page', 1, type=int)
+
+    # Se excluyen ventas que ya tengan un envío pendiente o en tránsito.
+    ids_ventas_con_envio_activo = obtener_ids_ventas_con_envio_activo()
+
+    if ids_ventas_con_envio_activo:
+        ventas_pendientes = Venta.query.filter(
+            ~Venta.id_venta.in_(ids_ventas_con_envio_activo)
+        ).order_by(Venta.id_venta.desc()).all()
+    else:
+        ventas_pendientes = Venta.query.order_by(Venta.id_venta.desc()).all()
+
+    # Consulta base para listado.
+    query_envios = Envio.query
+
+    # Filtro por estado.
+    if filtro_estado in ['Pendiente', 'En Tránsito', 'Entregado']:
+        query_envios = query_envios.filter(Envio.estado_entrega == filtro_estado)
+
+    # Se aplican filtros compartidos.
+    query_envios = aplicar_filtros_envios(
+        query=query_envios,
+        texto_busqueda=filtro_q,
+        fecha_inicio=filtro_fecha_inicio,
+        fecha_fin=filtro_fecha_fin,
+        id_chofer=filtro_id_chofer,
+        id_vehiculo=filtro_id_vehiculo
+    )
+
+    # Se ordena y pagina el resultado final.
+    query_envios = query_envios.order_by(
+        Envio.fecha_salida.desc(),
+        Envio.id_envio.desc()
+    )
+
+    paginacion_envios = paginar_query(query_envios, page=pagina_envios, per_page=10)
+    envios = paginacion_envios['items']
+
+    # Catálogos para formulario y filtros.
+    total_envios = Envio.query.count()
+    vehiculos_disponibles = Vehiculo.query.filter_by(estado='Disponible').order_by(Vehiculo.placa.asc()).all()
+    vehiculos_filtro = Vehiculo.query.order_by(Vehiculo.placa.asc()).all()
+    choferes = Chofer.query.order_by(Chofer.nombre.asc()).all()
+
+    # Resumen rápido.
+    resumen_choferes, resumen_vehiculos = obtener_resumen_operativo_envios()
+
+    # Conteos globales por estado.
+    conteo_pendientes = Envio.query.filter_by(estado_entrega='Pendiente').count()
+    conteo_transito = Envio.query.filter_by(estado_entrega='En Tránsito').count()
+    conteo_entregados = Envio.query.filter_by(estado_entrega='Entregado').count()
+
+    return render_template(
+        'transporte.html',
+        envios=envios,
+        ventas=ventas_pendientes,
+        vehiculos_disponibles=vehiculos_disponibles,
+        vehiculos_filtro=vehiculos_filtro,
+        choferes=choferes,
+        total_envios=total_envios,
+        filtro_q=filtro_q,
+        filtro_estado=filtro_estado,
+        filtro_fecha_inicio=filtro_fecha_inicio,
+        filtro_fecha_fin=filtro_fecha_fin,
+        filtro_id_chofer=filtro_id_chofer,
+        filtro_id_vehiculo=filtro_id_vehiculo,
+        pagina_envios=paginacion_envios['page'],
+        total_paginas_envios=paginacion_envios['total_pages'],
+        total_filtrados_envios=paginacion_envios['total'],
+        tiene_anterior_envios=paginacion_envios['has_prev'],
+        tiene_siguiente_envios=paginacion_envios['has_next'],
+        resumen_choferes=resumen_choferes,
+        resumen_vehiculos=resumen_vehiculos,
+        conteo_pendientes=conteo_pendientes,
+        conteo_transito=conteo_transito,
+        conteo_entregados=conteo_entregados
+    )
+# ==========================================================
+# BLOQUE: Gestión de vehículos
+# Propósito:
+# - Registrar unidades con validación básica
+# - Evitar placas duplicadas
+# - Mostrar mensajes claros al usuario
+# ==========================================================
+@app.route('/vehiculos', methods=['GET', 'POST'])
+def vehiculos():
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        # Se leen y limpian los datos del formulario.
+        placa = (request.form.get('placa') or '').strip().upper()
+        modelo = (request.form.get('modelo') or '').strip()
+        capacidad = request.form.get('capacidad', type=float)
+
+        # Validaciones principales del formulario.
+        if not placa or not modelo or capacidad is None:
+            flash('Completa todos los campos de la unidad.', 'warning')
+            return redirect(url_for('vehiculos'))
+
+        if capacidad <= 0:
+            flash('La capacidad debe ser mayor a cero.', 'warning')
+            return redirect(url_for('vehiculos'))
+
+        # Se valida que no exista otra unidad con la misma placa.
+        existente = Vehiculo.query.filter_by(placa=placa).first()
+        if existente:
+            flash(f'La placa {placa} ya está registrada.', 'danger')
+            return redirect(url_for('vehiculos'))
+
+        try:
+            # Se crea la nueva unidad con estado inicial disponible.
+            nuevo = Vehiculo(
+                placa=placa,
+                modelo=modelo,
+                capacidad_kg=capacidad,
+                estado='Disponible'
+            )
+            db.session.add(nuevo)
+            db.session.commit()
+
+            flash(f'Unidad {placa} registrada correctamente.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'No fue posible registrar la unidad: {str(e)}', 'danger')
+
+        return redirect(url_for('vehiculos'))
+
+    # Se cargan todas las unidades para la vista.
+    lista = Vehiculo.query.order_by(Vehiculo.estado.asc(), Vehiculo.placa.asc()).all()
+    return render_template('vehiculos.html', vehiculos=lista)
+
+
+# ==========================================================
+# BLOQUE: Gestión de choferes
+# Propósito:
+# - Registrar choferes con validaciones básicas
+# - Mejorar consistencia de datos
+# - Mostrar mensajes claros al usuario
+# ==========================================================
+@app.route('/choferes', methods=['GET', 'POST'])
+def choferes():
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        # Se leen y limpian los datos del formulario.
+        nombre = (request.form.get('nombre') or '').strip()
+        licencia = (request.form.get('licencia') or '').strip().upper()
+        telefono = (request.form.get('telefono') or '').strip()
+
+        # Validaciones básicas del formulario.
+        if not nombre or not licencia or not telefono:
+            flash('Completa todos los campos del chofer.', 'warning')
+            return redirect(url_for('choferes'))
+
+        # Validación simple para no repetir licencias exactas.
+        licencia_existente = Chofer.query.filter_by(licencia=licencia).first()
+        if licencia_existente:
+            flash(f'La licencia {licencia} ya está registrada.', 'danger')
+            return redirect(url_for('choferes'))
+
+        try:
+            # Se crea el registro del chofer.
+            nuevo = Chofer(
+                nombre=nombre,
+                licencia=licencia,
+                telefono=telefono
+            )
+            db.session.add(nuevo)
+            db.session.commit()
+
+            flash(f'Chofer {nombre} registrado correctamente.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'No fue posible registrar el chofer: {str(e)}', 'danger')
+
+        return redirect(url_for('choferes'))
+
+    # Se listan choferes ordenados por nombre.
+    lista = Chofer.query.order_by(Chofer.nombre.asc()).all()
+    return render_template('choferes.html', choferes=lista)
+
+
+@app.route('/embarques', methods=['GET', 'POST'])
+def embarques():
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        # Se leen los pesos y demás datos del formulario.
+        peso_bruto = request.form.get('peso_bruto', type=float)
+        peso_tara = request.form.get('peso_tara', type=float)
+        tipo_mov = (request.form.get('tipo_movimiento') or '').strip()
+        placas = (request.form.get('placas') or '').strip()
+        chofer = (request.form.get('chofer') or '').strip()
+        origen_destino = (request.form.get('origen_destino') or '').strip()
+        tipo_metal_ingresado = (request.form.get('tipo_metal') or '').strip()
+
+        # Validaciones del pesaje.
+        if peso_bruto is None or peso_tara is None:
+            flash('Debes capturar peso bruto y peso tara.', 'warning')
+            return redirect(url_for('embarques'))
+
+        if peso_bruto <= 0 or peso_tara < 0:
+            flash('Los pesos deben ser mayores a cero.', 'warning')
+            return redirect(url_for('embarques'))
+
+        if peso_tara >= peso_bruto:
+            flash('El peso tara no puede ser mayor o igual al peso bruto.', 'danger')
+            return redirect(url_for('embarques'))
+
+        if not tipo_mov or not placas or not chofer or not origen_destino or not tipo_metal_ingresado:
+            flash('Completa todos los campos del embarque.', 'warning')
+            return redirect(url_for('embarques'))
+
+        peso_neto = peso_bruto - peso_tara
+
+        try:
+            # Se registra el movimiento de báscula.
+            nuevo_embarque = Embarque(
+                tipo_movimiento=tipo_mov,
+                placas=placas,
+                chofer=chofer,
+                origen_destino=origen_destino,
+                tipo_metal=tipo_metal_ingresado,
+                peso_bruto_kg=peso_bruto,
+                peso_tara_kg=peso_tara,
+                peso_neto_kg=peso_neto,
+                fecha_registro=datetime.now()
+            )
+            db.session.add(nuevo_embarque)
+
+            # Automatización para entradas: suma al inventario de metal.
+            if tipo_mov == 'Entrada':
+                inventario = InventarioMetal.query.filter_by(
+                    tipo_metal=tipo_metal_ingresado
+                ).first()
+
+                if inventario:
+                    inventario.cantidad_kg += peso_neto
+                else:
+                    nuevo_inventario = InventarioMetal(
+                        id_almacen=1,
+                        id_proveedor=1,
+                        tipo_metal=tipo_metal_ingresado,
+                        cantidad_kg=peso_neto,
+                        fecha_entrada=date.today()
+                    )
+                    db.session.add(nuevo_inventario)
+
+            db.session.commit()
+            flash(
+                f'Embarque registrado correctamente. Peso neto: {peso_neto:,.2f} kg.',
+                'success'
+            )
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al registrar el embarque: {str(e)}', 'danger')
+
+        return redirect(url_for('embarques'))
+
+    # Se carga historial y catálogos del formulario.
+    lista_embarques = Embarque.query.order_by(
+        Embarque.fecha_registro.desc(),
+        Embarque.id_embarque.desc()
+    ).all()
+
+    vehiculos = Vehiculo.query.order_by(Vehiculo.placa.asc()).all()
+    proveedores = Proveedor.query.order_by(Proveedor.nombre.asc()).all()
+    clientes = Cliente.query.order_by(Cliente.empresa.asc()).all()
+    lista_choferes = Chofer.query.order_by(Chofer.nombre.asc()).all()
+
+    # Se obtienen tipos de metal ya registrados para sugerencias en el input.
+    metales_unicos = db.session.query(InventarioMetal.tipo_metal).distinct().all()
+    lista_metales = [m[0] for m in metales_unicos if m[0]]
+
+    return render_template(
+        'embarques.html',
+        embarques=lista_embarques,
+        vehiculos=vehiculos,
+        proveedores=proveedores,
+        clientes=clientes,
+        choferes=lista_choferes,
+        metales=lista_metales
+    )
+
+# ==========================================================
+# BLOQUE: Finalizar entrega desde transporte
+# Propósito:
+# - Cerrar envío
+# - Liberar vehículo
+# - Mantener sincronía con dispatch
+# ==========================================================
+@app.route('/entregar/<int:id_envio>', methods=['POST'])
+def finalizar_entrega(id_envio):
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    envio = Envio.query.get_or_404(id_envio)
+
+    try:
+        if envio.estado_entrega != 'Entregado':
+            marcar_envio_como_entregado(envio)
+            db.session.commit()
+            flash(f'El envío #{envio.id_envio} se marcó como entregado.', 'success')
+        else:
+            flash('Ese envío ya estaba marcado como entregado.', 'info')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'No fue posible finalizar la entrega: {str(e)}', 'danger')
+
+    return redirect(url_for('transporte'))
+
+
+# ==========================================================
+# BLOQUE: Compatibilidad con endpoint viejo de dispatch
+# Propósito:
+# - Mantener funcionando llamadas antiguas a completar_envio
+# - Usar exactamente la misma lógica que finalizar_entrega
+# ==========================================================
+@app.route('/completar_envio/<int:id>', methods=['POST'])
+def completar_envio(id):
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    envio = Envio.query.get_or_404(id)
+
+    try:
+        if envio.estado_entrega != 'Entregado':
+            marcar_envio_como_entregado(envio)
+            db.session.commit()
+            flash(f'El envío #{envio.id_envio} se marcó como entregado.', 'success')
+        else:
+            flash('Ese envío ya estaba marcado como entregado.', 'info')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'No fue posible completar el envío: {str(e)}', 'danger')
+
+    return redirect(url_for('dispatch_mapa'))
 
 @app.route('/pedidos')
 def lista_pedidos():
-    # Usamos PedidoVenta que ya está conectado a tu clase Cliente
-    pedidos = PedidoVenta.query.order_by(PedidoVenta.fecha_pedido.desc()).all()
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    # Se listan pedidos del más reciente al más antiguo.
+    pedidos = PedidoVenta.query.order_by(
+        PedidoVenta.fecha_pedido.desc(),
+        PedidoVenta.id_pedido.desc()
+    ).all()
+
     return render_template('pedidos.html', pedidos=pedidos)
+
 
 @app.route('/nuevo_pedido', methods=['GET', 'POST'])
 def nuevo_pedido():
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
     if request.method == 'POST':
-        id_cliente = request.form.get('id_cliente')
-        nuevo_p = PedidoVenta(id_cliente=id_cliente, estado='Pendiente', total=0.0)
+        id_cliente = request.form.get('id_cliente', type=int)
+
+        if not id_cliente:
+            flash('Debes seleccionar un cliente.', 'warning')
+            return redirect(url_for('nuevo_pedido'))
+
+        cliente = Cliente.query.get(id_cliente)
+        if not cliente:
+            flash('El cliente seleccionado no existe.', 'danger')
+            return redirect(url_for('nuevo_pedido'))
+
         try:
+            # Se crea el pedido en estado pendiente y en cero.
+            nuevo_p = PedidoVenta(
+                id_cliente=id_cliente,
+                estado='Pendiente',
+                total=0.0
+            )
             db.session.add(nuevo_p)
             db.session.commit()
+
+            flash(
+                f'Pedido #{nuevo_p.id_pedido:04d} creado correctamente.',
+                'success'
+            )
             return redirect(url_for('detalle_pedido', id=nuevo_p.id_pedido))
         except Exception as e:
             db.session.rollback()
-            flash(f"Error al crear pedido: {str(e)}", "danger")
-            
-    clientes = Cliente.query.all()
+            flash(f'Error al crear pedido: {str(e)}', 'danger')
+
+    clientes = Cliente.query.order_by(Cliente.empresa.asc(), Cliente.nombre_contacto.asc()).all()
     return render_template('nuevo_pedido.html', clientes=clientes)
+
 
 @app.route('/pedido/<int:id>')
 def detalle_pedido(id):
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
     pedido = PedidoVenta.query.get_or_404(id)
-    # Consultamos productos y calculamos su stock actual manualmente para el select
+
+    # Se calcula stock por producto para mostrarlo en el selector.
     productos_con_stock = []
-    todos_los_productos = Producto.query.all()
-    
-    for p in todos_los_productos:
-        stock = db.session.query(func.sum(InventarioProducto.cantidad_stock))\
-            .filter(InventarioProducto.id_producto == p.id_producto).scalar() or 0
-        productos_con_stock.append({'obj': p, 'stock': stock})
-        
-    return render_template('detalle_pedido.html', pedido=pedido, productos=productos_con_stock)
+    todos_los_productos = Producto.query.order_by(Producto.nombre_producto.asc()).all()
+
+    for producto in todos_los_productos:
+        stock = db.session.query(func.sum(InventarioProducto.cantidad_stock)).filter(
+            InventarioProducto.id_producto == producto.id_producto
+        ).scalar() or 0
+
+        productos_con_stock.append({
+            'obj': producto,
+            'stock': stock
+        })
+
+    return render_template(
+        'detalle_pedido.html',
+        pedido=pedido,
+        productos=productos_con_stock
+    )
 
 
 @app.route('/despachar_pedido/<int:id_pedido>', methods=['POST'])
 def despachar_pedido(id_pedido):
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
     pedido = PedidoVenta.query.get_or_404(id_pedido)
-    
+
     if pedido.estado != 'Pendiente':
-        flash("Este pedido ya fue procesado anteriormente.", "warning")
+        flash('Este pedido ya fue procesado anteriormente.', 'warning')
+        return redirect(url_for('detalle_pedido', id=id_pedido))
+
+    if not pedido.detalles:
+        flash('No puedes despachar un pedido sin artículos.', 'warning')
         return redirect(url_for('detalle_pedido', id=id_pedido))
 
     try:
-        # 1. Recorrer los artículos del pedido para restar del inventario
+        # Se recorre cada artículo del pedido y se descuenta del inventario.
         for item in pedido.detalles:
-            # Buscamos el registro en InventarioProducto para ese ID de producto
-            # (Si manejas varias bodegas, podrías filtrar también por id_almacen)
-            inventario = InventarioProducto.query.filter_by(id_producto=item.id_producto).first()
-            
-            if inventario:
-                if inventario.cantidad_stock >= item.cantidad:
-                    inventario.cantidad_stock -= item.cantidad
-                else:
-                    # Una última validación de seguridad
-                    flash(f"Error: Stock insuficiente para {item.producto.nombre_producto}", "danger")
-                    db.session.rollback()
-                    return redirect(url_for('detalle_pedido', id=id_pedido))
-            else:
-                flash(f"El producto {item.id_producto} no existe en inventario.", "danger")
+            registros_inventario = InventarioProducto.query.filter_by(
+                id_producto=item.id_producto
+            ).order_by(InventarioProducto.fecha_fabricacion.asc()).all()
+
+            stock_total = sum(reg.cantidad_stock for reg in registros_inventario)
+
+            if stock_total < item.cantidad:
+                flash(
+                    f'Stock insuficiente para {item.producto.nombre_producto}. '
+                    f'Disponible: {stock_total}, solicitado: {item.cantidad}.',
+                    'danger'
+                )
                 db.session.rollback()
                 return redirect(url_for('detalle_pedido', id=id_pedido))
 
-        # 2. Cambiar el estado del pedido
+            # Se descuenta stock incluso si el producto está repartido entre varios registros.
+            cantidad_por_descontar = item.cantidad
+
+            for registro in registros_inventario:
+                if cantidad_por_descontar <= 0:
+                    break
+
+                descuento = min(registro.cantidad_stock, cantidad_por_descontar)
+                registro.cantidad_stock -= descuento
+                cantidad_por_descontar -= descuento
+
+        # Se cambia el estado una vez descontado todo correctamente.
         pedido.estado = 'Despachado'
-        
+
         db.session.commit()
-        flash(f"Pedido #{id_pedido:04d} despachado con éxito. Inventario actualizado.", "success")
-        
+        flash(
+            f'Pedido #{id_pedido:04d} despachado con éxito. Inventario actualizado.',
+            'success'
+        )
     except Exception as e:
         db.session.rollback()
-        flash(f"Error crítico: {str(e)}", "danger")
-        
+        flash(f'Error al despachar el pedido: {str(e)}', 'danger')
+
     return redirect(url_for('lista_pedidos'))
+
 
 @app.route('/agregar_item/<int:id_pedido>', methods=['POST'])
 def agregar_item(id_pedido):
-    id_prod = request.form.get('id_producto')
-    qty_solicitada = int(request.form.get('cantidad'))
-    
-    # 1. Obtener el producto y su precio
-    prod = Producto.query.get_or_404(id_prod)
-    precio_vta = prod.precio  # Usamos la nueva columna precio de tu BD
-    
-    # 2. VALIDACIÓN DE INVENTARIO
-    # Sumamos todo el stock disponible para este producto en todos los almacenes
-    stock_disponible = db.session.query(func.sum(InventarioProducto.cantidad_stock))\
-        .filter(InventarioProducto.id_producto == id_prod).scalar() or 0
-    
-    if qty_solicitada > stock_disponible:
-        flash(f"Stock insuficiente. Solo tienes {stock_disponible} unidades de {prod.nombre_producto}.", "danger")
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    pedido = PedidoVenta.query.get_or_404(id_pedido)
+
+    if pedido.estado != 'Pendiente':
+        flash('Solo puedes editar pedidos pendientes.', 'warning')
         return redirect(url_for('detalle_pedido', id=id_pedido))
-    
-    # 3. Si hay stock, procedemos a guardar
-    subtotal = precio_vta * qty_solicitada
-    
-    nuevo_item = DetallePedido(
-        id_pedido=id_pedido,
-        id_producto=id_prod,
-        cantidad=qty_solicitada,
-        precio_unitario=precio_vta
+
+    id_prod = request.form.get('id_producto', type=int)
+    qty_solicitada = request.form.get('cantidad', type=int)
+
+    if not id_prod or not qty_solicitada:
+        flash('Selecciona un producto y una cantidad válida.', 'warning')
+        return redirect(url_for('detalle_pedido', id=id_pedido))
+
+    if qty_solicitada <= 0:
+        flash('La cantidad debe ser mayor a cero.', 'warning')
+        return redirect(url_for('detalle_pedido', id=id_pedido))
+
+    prod = Producto.query.get_or_404(id_prod)
+    precio_vta = prod.precio or 0.0
+
+    # Se calcula el stock físico total disponible.
+    stock_disponible = db.session.query(func.sum(InventarioProducto.cantidad_stock)).filter(
+        InventarioProducto.id_producto == id_prod
+    ).scalar() or 0
+
+    # Se calcula cuánto de ese producto ya está capturado dentro del mismo pedido.
+    cantidad_ya_en_pedido = sum(
+        item.cantidad for item in pedido.detalles if item.id_producto == id_prod
     )
-    
-    # Actualizar el total de la cabecera del pedido
-    pedido = PedidoVenta.query.get(id_pedido)
-    pedido.total += subtotal
-    
+
+    disponible_para_agregar = stock_disponible - cantidad_ya_en_pedido
+
+    if qty_solicitada > disponible_para_agregar:
+        flash(
+            f'Stock insuficiente. Disponible para agregar: {disponible_para_agregar} '
+            f'unidades de {prod.nombre_producto}.',
+            'danger'
+        )
+        return redirect(url_for('detalle_pedido', id=id_pedido))
+
     try:
-        db.session.add(nuevo_item)
+        # Si el producto ya existe en el pedido, solo incrementamos cantidad.
+        item_existente = DetallePedido.query.filter_by(
+            id_pedido=id_pedido,
+            id_producto=id_prod
+        ).first()
+
+        if item_existente:
+            item_existente.cantidad += qty_solicitada
+        else:
+            nuevo_item = DetallePedido(
+                id_pedido=id_pedido,
+                id_producto=id_prod,
+                cantidad=qty_solicitada,
+                precio_unitario=precio_vta
+            )
+            db.session.add(nuevo_item)
+
+        # Se sincroniza el total del pedido.
+        db.session.flush()
+        recalcular_total_pedido(pedido)
+
         db.session.commit()
-        flash(f"¡{prod.nombre_producto} agregado correctamente!", "success")
+        flash(f'{prod.nombre_producto} agregado correctamente al pedido.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f"Error al guardar: {str(e)}", "danger")
-        
+        flash(f'Error al guardar el artículo: {str(e)}', 'danger')
+
     return redirect(url_for('detalle_pedido', id=id_pedido))
+
+
+@app.route('/eliminar_item/<int:id_detalle>', methods=['POST'])
+def eliminar_item(id_detalle):
+    # Validación de sesión para proteger el módulo.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    item = DetallePedido.query.get_or_404(id_detalle)
+    pedido = PedidoVenta.query.get_or_404(item.id_pedido)
+
+    if pedido.estado != 'Pendiente':
+        flash('No puedes eliminar artículos de un pedido ya despachado.', 'warning')
+        return redirect(url_for('detalle_pedido', id=pedido.id_pedido))
+
+    try:
+        # Se elimina el detalle y luego se recalcula el total.
+        db.session.delete(item)
+        db.session.flush()
+
+        recalcular_total_pedido(pedido)
+
+        db.session.commit()
+        flash('Artículo eliminado del pedido correctamente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'No fue posible eliminar el artículo: {str(e)}', 'danger')
+
+    return redirect(url_for('detalle_pedido', id=pedido.id_pedido))
+@app.route('/imprimir_vale/<int:id_envio>')
+def imprimir_vale(id_envio):
+    # Validación de sesión para proteger la generación del vale.
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    # Se obtiene el envío solicitado.
+    envio = Envio.query.get_or_404(id_envio)
+
+    # Se crea el documento PDF.
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Encabezado principal del documento.
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "ECODATA - VALE DE SALIDA", 0, 1, "C")
+
+    pdf.set_font("Arial", "", 10)
+    fecha_salida = envio.fecha_salida.strftime('%d/%m/%Y %H:%M') if envio.fecha_salida else "N/D"
+    pdf.cell(0, 8, f"Fecha de salida: {fecha_salida}", 0, 1, "R")
+    pdf.ln(4)
+
+    # Título del bloque de datos.
+    pdf.set_fill_color(240, 240, 240)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, f"Guia de despacho #ENV-{envio.id_envio}", 1, 1, "L", True)
+
+    pdf.ln(4)
+    pdf.set_font("Arial", "", 11)
+
+    # Datos principales del envío.
+    cliente_nombre = "N/D"
+    empresa = "N/D"
+    venta_id = "N/D"
+    producto = "N/D"
+    cantidad = "N/D"
+
+    if envio.venta:
+        venta_id = envio.venta.id_venta
+
+        # Nombre de cliente y empresa asociados a la venta.
+        if getattr(envio.venta, 'cliente', None):
+            cliente_nombre = envio.venta.cliente.nombre_contacto or "N/D"
+            empresa = envio.venta.cliente.empresa or "N/D"
+
+        # Datos del producto en caso de existir esa relación.
+        if getattr(envio.venta, 'producto', None):
+            producto = envio.venta.producto.nombre_producto or "N/D"
+
+        # Cantidad de la venta, si el modelo la tiene.
+        cantidad = getattr(envio.venta, 'cantidad', "N/D")
+
+    vehiculo_placa = envio.vehiculo.placa if getattr(envio, 'vehiculo', None) else "N/D"
+    chofer_nombre = envio.chofer.nombre if getattr(envio, 'chofer', None) else "N/D"
+    destino = envio.destino or "N/D"
+    estado = envio.estado_entrega or "N/D"
+
+    # Contenido del vale.
+    pdf.cell(0, 8, f"Cliente: {cliente_nombre}", 0, 1)
+    pdf.cell(0, 8, f"Empresa: {empresa}", 0, 1)
+    pdf.cell(0, 8, f"Venta relacionada: #{venta_id}", 0, 1)
+    pdf.cell(0, 8, f"Producto: {producto}", 0, 1)
+    pdf.cell(0, 8, f"Cantidad: {cantidad}", 0, 1)
+    pdf.cell(0, 8, f"Vehiculo: {vehiculo_placa}", 0, 1)
+    pdf.cell(0, 8, f"Chofer: {chofer_nombre}", 0, 1)
+    pdf.cell(0, 8, f"Destino: {destino}", 0, 1)
+    pdf.cell(0, 8, f"Estado: {estado}", 0, 1)
+
+    pdf.ln(18)
+
+    # Área de firmas.
+    pdf.cell(90, 10, "______________________________", 0, 0, "C")
+    pdf.cell(20, 10, "", 0, 0)
+    pdf.cell(80, 10, "______________________________", 0, 1, "C")
+
+    pdf.cell(90, 8, "Entrega EcoData", 0, 0, "C")
+    pdf.cell(20, 8, "", 0, 0)
+    pdf.cell(80, 8, "Recibe cliente", 0, 1, "C")
+
+    # Se construye la respuesta HTTP con el PDF.
+    response = make_response(pdf.output(dest='S').encode('latin-1'))
+    response.headers.set(
+        'Content-Disposition',
+        'attachment',
+        filename=f'Vale_ENV_{envio.id_envio}.pdf'
+    )
+    response.headers.set('Content-Type', 'application/pdf')
+
+    return response
 
 # --- MÓDULO DE PRIVILEGIOS Y GESTIÓN DE USUARIOS ---
 @app.route('/usuarios', methods=['GET', 'POST'])

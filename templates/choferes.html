@@ -1,44 +1,298 @@
 {% extends "base.html" %}
-{% block content %}
-<div style="padding: 20px;">
-    <h2 style="margin-bottom: 25px; color: #2c3e50; font-weight: 700;">📂 Directorio de Choferes</h2>
 
-    <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 30px;">
-        <form method="POST" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; align-items: end;">
-            <div>
-                <label style="font-weight:600; display:block; margin-bottom:5px;">Nombre Completo</label>
-                <input type="text" name="nombre" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;" required>
-            </div>
-            <div>
-                <label style="font-weight:600; display:block; margin-bottom:5px;">Licencia</label>
-                <input type="text" name="licencia" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;" required>
-            </div>
-            <div>
-                <label style="font-weight:600; display:block; margin-bottom:5px;">Teléfono</label>
-                <input type="text" name="telefono" class="form-control" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;" required>
-            </div>
-            <button type="submit" style="background:#3498db; color:white; border:none; padding:12px; border-radius:6px; font-weight:700; cursor:pointer;">Registrar Chofer</button>
-        </form>
+{% block title %}Directorio de Choferes - EcoData{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del módulo de choferes.
+    */
+    .driver-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 18px;
+    }
+
+    .driver-card {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+    }
+
+    .driver-card-top {
+        padding: 22px 18px 18px;
+        text-align: center;
+        border-bottom: 1px solid var(--border);
+        background: #fbfdff;
+    }
+
+    .driver-avatar {
+        width: 62px;
+        height: 62px;
+        background: var(--brand-blue);
+        color: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 12px;
+        font-size: 1.5rem;
+        font-weight: 800;
+        box-shadow: 0 12px 24px rgba(39, 150, 219, 0.2);
+    }
+
+    .driver-name {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .driver-body {
+        padding: 16px 18px 18px;
+    }
+
+    .driver-row {
+        margin-bottom: 10px;
+        font-size: 0.92rem;
+        color: #334155;
+    }
+
+    .driver-footer {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid #eef2f7;
+        text-align: center;
+    }
+
+    .driver-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .driver-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .driver-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .driver-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .driver-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Directorio de choferes</h1>
+        <p class="page-subtitle">
+            Registra operadores, consulta sus licencias y mantén actualizado el directorio de transporte.
+        </p>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-        {% for c in choferes %}
-        <div style="background:white; border-radius:15px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.04); border:1px solid #eee;">
-            <div style="background: #f8f9fa; padding: 20px; text-align: center; border-bottom: 1px solid #eee;">
-                <div style="width:60px; height:60px; background:#3498db; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; font-size:1.5em; font-weight:700;">
-                    {{ c.nombre[0]|upper }}
+    <a href="{{ url_for('vehiculos') }}" class="btn btn-secondary">
+        <i class="fas fa-truck"></i>
+        Ver flota
+    </a>
+</div>
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Choferes registrados</div>
+        <div class="kpi-value">{{ choferes|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Licencias capturadas</div>
+        <div class="kpi-value">{{ choferes|selectattr('licencia')|list|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Teléfonos capturados</div>
+        <div class="kpi-value">{{ choferes|selectattr('telefono')|list|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Estado general</div>
+        <div class="kpi-value">Activo</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-id-card"></i> Estado del directorio</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="driver-summary">
+                <div class="driver-summary-item">
+                    <div>
+                        <strong>Choferes activos</strong>
+                        <span>Personal listo para asignación</span>
+                    </div>
+                    <span class="badge badge-success">{{ choferes|length }}</span>
                 </div>
-                <h4 style="margin:0; color:#2c3e50;">{{ c.nombre }}</h4>
-            </div>
-            <div style="padding: 15px;">
-                <p style="margin:5px 0; font-size:0.9em;"><strong>🆔 Licencia:</strong> {{ c.licencia }}</p>
-                <p style="margin:5px 0; font-size:0.9em;"><strong>📞 Tel:</strong> {{ c.telefono }}</p>
-                <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f4f4f4; text-align:center;">
-                    <span style="font-size:0.75em; color:#27ae60; font-weight:700;">● ACTIVO</span>
+
+                <div class="driver-summary-item">
+                    <div>
+                        <strong>Licencias registradas</strong>
+                        <span>Documentación visible en sistema</span>
+                    </div>
+                    <span class="badge badge-info">{{ choferes|selectattr('licencia')|list|length }}</span>
+                </div>
+
+                <div class="driver-summary-item">
+                    <div>
+                        <strong>Contactos disponibles</strong>
+                        <span>Números telefónicos capturados</span>
+                    </div>
+                    <span class="badge badge-neutral">{{ choferes|selectattr('telefono')|list|length }}</span>
                 </div>
             </div>
         </div>
-        {% endfor %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones operativas</h3>
+        </div>
+
+        <div class="card-body">
+            {% if choferes %}
+                <div class="driver-empty-note">
+                    Mantén actualizada la licencia y el teléfono de cada operador para agilizar
+                    la asignación de envíos y el seguimiento de rutas.
+                </div>
+            {% else %}
+                <div class="driver-empty-note">
+                    Registra al menos un chofer para comenzar a usar el flujo de despacho y entregas.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-user-plus"></i> Registrar chofer</h3>
+    </div>
+
+    <div class="card-body">
+        <form method="POST">
+            <div class="form-grid cols-4">
+                <div class="field">
+                    <label for="nombre">Nombre completo</label>
+                    <input
+                        id="nombre"
+                        type="text"
+                        name="nombre"
+                        class="input"
+                        required
+                    />
+                </div>
+
+                <div class="field">
+                    <label for="licencia">Licencia</label>
+                    <input
+                        id="licencia"
+                        type="text"
+                        name="licencia"
+                        class="input"
+                        required
+                    />
+                </div>
+
+                <div class="field">
+                    <label for="telefono">Teléfono</label>
+                    <input
+                        id="telefono"
+                        type="text"
+                        name="telefono"
+                        class="input"
+                        required
+                    />
+                </div>
+
+                <div class="field" style="display:flex; align-items:flex-end;">
+                    <button type="submit" class="btn btn-primary" style="width:100%;">
+                        <i class="fas fa-user-plus"></i>
+                        Registrar chofer
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-address-book"></i> Directorio operativo</h3>
+        <span class="badge badge-neutral">{{ choferes|length }} registros</span>
+    </div>
+
+    <div class="card-body">
+        <div class="driver-card-grid">
+            {% for c in choferes %}
+                <div class="driver-card">
+                    <div class="driver-card-top">
+                        <div class="driver-avatar">
+                            {{ c.nombre[:1]|upper }}
+                        </div>
+                        <h4 class="driver-name">{{ c.nombre }}</h4>
+                    </div>
+
+                    <div class="driver-body">
+                        <div class="driver-row">
+                            <strong>Licencia:</strong> {{ c.licencia }}
+                        </div>
+
+                        <div class="driver-row">
+                            <strong>Teléfono:</strong> {{ c.telefono }}
+                        </div>
+
+                        <div class="driver-footer">
+                            <span class="badge badge-success">Activo</span>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-user-group"></i>
+                            No hay choferes registrados todavía.
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}

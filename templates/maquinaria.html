@@ -2,93 +2,308 @@
 
 {% block title %}Control de Maquinaria - EcoData{% endblock %}
 
-{% block content %}
+{% block extra_head %}
 <style>
-    :root {
-        --primary-dark: #2d3748;
-        --accent-red: #e53e3e;
-        --success: #38a169;
-        --warning: #d69e2e;
-        --bg-light: #f7fafc;
+    /*
+        Propósito:
+        Estilos específicos del módulo de maquinaria.
+    */
+    .machine-name {
+        font-weight: 800;
+        color: var(--brand-dark);
     }
-    .card-panel { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; overflow: hidden; }
-    .card-header-dark { background: var(--primary-dark); color: white; padding: 18px 25px; display: flex; align-items: center; gap: 12px; }
-    .form-input { width: 100%; padding: 10px; border: 2px solid #edf2f7; border-radius: 8px; }
-    .btn-submit { background: var(--primary-dark); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .table-custom { width: 100%; border-collapse: collapse; }
-    .table-custom th { text-align: left; padding: 15px; border-bottom: 2px solid #edf2f7; color: #718096; font-size: 0.8rem; text-transform: uppercase; }
-    .table-custom td { padding: 15px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
-    
-    .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
-    .status-operativa { background: #c6f6d5; color: #22543d; }
-    .status-reparacion { background: #feebc8; color: #975a16; }
-    .status-fuera { background: #fed7d7; color: #822727; }
-</style>
 
-<div style="padding: 30px; background: var(--bg-light); min-height: 100vh;">
-    
-    <div class="card-panel">
-        <div class="card-header-dark">
-            <i class="fas fa-cogs"></i>
-            <h3 style="margin:0; font-size: 1.2rem;">Alta de Equipo Industrial</h3>
-        </div>
-        <form action="/maquinaria" method="POST" style="padding: 25px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: end;">
-            <div>
-                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Nombre o Código</label>
-                <input type="text" name="nombre" class="form-input" placeholder="Ej: Fundidora 1, Prensa Hidráulica..." required>
-            </div>
-            <div>
-                <label style="font-weight:bold; font-size:0.85rem; color:#4a5568;">Modelo / Marca</label>
-                <input type="text" name="modelo" class="form-input" placeholder="Ej: Modelo XJ-500, Genérico..." required>
-            </div>
-            <button type="submit" class="btn-submit"><i class="fas fa-plus"></i> Registrar Equipo</button>
-        </form>
+    .machine-meta {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-top: 4px;
+    }
+
+    .machine-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .machine-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .machine-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .machine-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .machine-select-inline {
+        min-width: 180px;
+    }
+
+    .machine-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!--
+    Propósito:
+    Encabezado del módulo de maquinaria.
+-->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Control de maquinaria</h1>
+        <p class="page-subtitle">
+            Registra equipos industriales, consulta su estado actual y actualiza disponibilidad operativa.
+        </p>
     </div>
 
-    <div class="card-panel">
-        <div style="padding: 20px 25px; border-bottom: 1px solid #edf2f7;">
-            <h4 style="margin:0; color: var(--primary-dark);"><i class="fas fa-industry"></i> Estado de la Planta</h4>
+    <a href="/procesos" class="btn btn-secondary">
+        <i class="fas fa-industry"></i>
+        Ver procesos
+    </a>
+</div>
+
+<!--
+    Propósito:
+    KPIs principales del módulo.
+-->
+{% set maquinas_operativas = maquinas | selectattr('estado', 'equalto', 'Operativa') | list %}
+{% set maquinas_reparacion = maquinas | selectattr('estado', 'equalto', 'En Reparación') | list %}
+{% set maquinas_fuera = maquinas | selectattr('estado', 'equalto', 'Fuera de Servicio') | list %}
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Equipos registrados</div>
+        <div class="kpi-value">{{ maquinas|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Operativas</div>
+        <div class="kpi-value">{{ maquinas_operativas|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">En reparación</div>
+        <div class="kpi-value">{{ maquinas_reparacion|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Fuera de servicio</div>
+        <div class="kpi-value">{{ maquinas_fuera|length }}</div>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Resumen operativo del estado de planta.
+-->
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-wave-square"></i> Estado de la planta</h3>
         </div>
-        <div style="overflow-x: auto;">
-            <table class="table-custom">
+
+        <div class="card-body">
+            <div class="machine-summary">
+                <div class="machine-summary-item">
+                    <div>
+                        <strong>Máquinas operativas</strong>
+                        <span>Equipos listos para producir</span>
+                    </div>
+                    <span class="badge badge-success">{{ maquinas_operativas|length }}</span>
+                </div>
+
+                <div class="machine-summary-item">
+                    <div>
+                        <strong>En reparación</strong>
+                        <span>Equipos bajo atención técnica</span>
+                    </div>
+                    <span class="badge badge-warning">{{ maquinas_reparacion|length }}</span>
+                </div>
+
+                <div class="machine-summary-item">
+                    <div>
+                        <strong>Fuera de servicio</strong>
+                        <span>Equipos no disponibles actualmente</span>
+                    </div>
+                    <span class="badge badge-neutral">{{ maquinas_fuera|length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones operativas</h3>
+        </div>
+
+        <div class="card-body">
+            {% if maquinas %}
+                <div class="machine-empty-note">
+                    Mantén actualizados los estados de cada equipo para que producción,
+                    reciclaje y mantenimiento tengan una referencia clara de disponibilidad.
+                </div>
+            {% else %}
+                <div class="machine-empty-note">
+                    Registra al menos un equipo industrial para comenzar a usar el control
+                    de maquinaria dentro de producción y reciclaje.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Formulario para alta de equipo industrial.
+    Se respetan nombres del zip:
+    - nombre
+    - modelo
+-->
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-plus-circle"></i> Alta de equipo industrial</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="/maquinaria" method="POST">
+            <div class="form-grid cols-3">
+                <div class="field">
+                    <label for="nombre">Nombre o código</label>
+                    <input
+                        id="nombre"
+                        type="text"
+                        name="nombre"
+                        class="input"
+                        placeholder="Ej. Fundidora 1, Prensa Hidráulica..."
+                        required
+                    />
+                </div>
+
+                <div class="field">
+                    <label for="modelo">Modelo / marca</label>
+                    <input
+                        id="modelo"
+                        type="text"
+                        name="modelo"
+                        class="input"
+                        placeholder="Ej. Modelo XJ-500, Genérico..."
+                        required
+                    />
+                </div>
+
+                <div class="field" style="display:flex; align-items:flex-end;">
+                    <button type="submit" class="btn btn-primary" style="width:100%;">
+                        <i class="fas fa-plus"></i>
+                        Registrar equipo
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Tabla principal del estado de la maquinaria.
+-->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-cogs"></i> Estado actual de la maquinaria</h3>
+        <span class="badge badge-neutral">{{ maquinas|length }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+        <div class="table-shell">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>ID</th>
                         <th>Equipo</th>
                         <th>Modelo</th>
-                        <th>Estado Actual</th>
-                        <th>Cambiar Estado</th>
+                        <th>Estado actual</th>
+                        <th>Cambiar estado</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in maquinas %}
-                    <tr>
-                        <td><strong>#MQ-{{ m.id_maquina }}</strong></td>
-                        <td style="font-weight: bold; color: #2d3748;">{{ m.nombre }}</td>
-                        <td>{{ m.modelo }}</td>
-                        <td>
-                            <span class="status-badge 
-                                {% if m.estado == 'Operativa' %}status-operativa
-                                {% elif m.estado == 'En Reparación' %}status-reparacion
-                                {% else %}status-fuera{% endif %}">
-                                {{ m.estado | upper }}
-                            </span>
-                        </td>
-                        <td>
-                            <form action="/actualizar_maquina/{{ m.id_maquina }}" method="POST" style="display: flex; gap: 10px;">
-                                <select name="estado" class="form-input" style="padding: 5px; width: auto; font-size: 0.85rem;">
-                                    <option value="Operativa" {% if m.estado == 'Operativa' %}selected{% endif %}>Operativa</option>
-                                    <option value="En Reparación" {% if m.estado == 'En Reparación' %}selected{% endif %}>En Reparación</option>
-                                    <option value="Fuera de Servicio" {% if m.estado == 'Fuera de Servicio' %}selected{% endif %}>Fuera de Servicio</option>
-                                </select>
-                                <button type="submit" class="btn-submit" style="padding: 5px 10px; font-size: 0.8rem;"><i class="fas fa-sync-alt"></i></button>
-                            </form>
-                        </td>
-                    </tr>
+                        <tr>
+                            <td>
+                                <strong>#MQ-{{ m.id_maquina }}</strong>
+                            </td>
+
+                            <td>
+                                <div class="machine-name">{{ m.nombre }}</div>
+                                <div class="machine-meta">Equipo industrial registrado</div>
+                            </td>
+
+                            <td>{{ m.modelo }}</td>
+
+                            <td>
+                                {% if m.estado == 'Operativa' %}
+                                    <span class="badge badge-success">Operativa</span>
+                                {% elif m.estado == 'En Reparación' %}
+                                    <span class="badge badge-warning">En reparación</span>
+                                {% else %}
+                                    <span class="badge badge-neutral">Fuera de servicio</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <!--
+                                    Propósito:
+                                    Formulario para actualizar el estado actual del equipo.
+                                    Se respetan:
+                                    - action="/actualizar_maquina/{{ m.id_maquina }}"
+                                    - name="estado"
+                                -->
+                                <form action="/actualizar_maquina/{{ m.id_maquina }}" method="POST" style="display:flex; gap:10px; flex-wrap:wrap;">
+                                    <select name="estado" class="select machine-select-inline">
+                                        <option value="Operativa" {% if m.estado == 'Operativa' %}selected{% endif %}>
+                                            Operativa
+                                        </option>
+                                        <option value="En Reparación" {% if m.estado == 'En Reparación' %}selected{% endif %}>
+                                            En Reparación
+                                        </option>
+                                        <option value="Fuera de Servicio" {% if m.estado == 'Fuera de Servicio' %}selected{% endif %}>
+                                            Fuera de Servicio
+                                        </option>
+                                    </select>
+
+                                    <button type="submit" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-rotate"></i>
+                                        Actualizar
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
                     {% else %}
-                    <tr>
-                        <td colspan="5" style="text-align: center; padding: 30px;">No hay maquinaria registrada en la planta.</td>
-                    </tr>
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <i class="fas fa-screwdriver-wrench"></i>
+                                    No hay maquinaria registrada en la planta.
+                                </div>
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>

@@ -1,23 +1,137 @@
 {% extends "base.html" %}
+
+{% block title %}Nuevo Pedido - EcoData{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos de alta de pedido.
+    */
+    .pedido-create-wrap {
+        max-width: 880px;
+        margin: 0 auto;
+    }
+
+    .pedido-create-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+
+    .pedido-client-card {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .pedido-client-card strong {
+        color: var(--brand-dark);
+    }
+
+    .pedido-client-card span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width: 600px; margin: 50px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-    <h2 style="margin-top: 0; color: #333; border-bottom: 2px solid #f2f4f6; padding-bottom: 15px;">Crear Nuevo Pedido</h2>
-    
-    <form action="{{ url_for('nuevo_pedido') }}" method="POST" style="margin-top: 25px;">
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #4e73df;">Seleccionar Cliente</label>
-            <select name="id_cliente" style="width: 100%; padding: 12px; border: 1px solid #d1d3e2; border-radius: 8px;" required>
-                <option value="" disabled selected>Busca un cliente...</option>
-                {% for cliente in clientes %}
-                    <option value="{{ cliente.id_cliente }}">{{ cliente.nombre_contacto }} - {{ cliente.empresa }}</option>
-                {% endfor %}
-            </select>
+<div class="pedido-create-wrap">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Crear nuevo pedido</h1>
+            <p class="page-subtitle">
+                Selecciona un cliente para crear la cabecera del pedido y después agregar los productos.
+            </p>
         </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 30px;">
-            <a href="{{ url_for('lista_pedidos') }}" style="text-align: center; padding: 14px; background: #f8f9fc; color: #5a5c69; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #d1d3e2;">Cancelar</a>
-            <button type="submit" style="padding: 14px; background: #4e73df; color: white; border-radius: 8px; border: none; font-weight: bold; cursor: pointer;">Crear Pedido</button>
+
+        <a href="{{ url_for('lista_pedidos') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Volver a pedidos
+        </a>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom: 22px;">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-users"></i> Clientes disponibles</h3>
+            </div>
+
+            <div class="card-body">
+                {% if clientes %}
+                    <div style="display:grid; gap:10px;">
+                        {% for cliente in clientes[:5] %}
+                            <div class="pedido-client-card">
+                                <strong>{{ cliente.nombre_contacto }}</strong><br>
+                                <span>{{ cliente.empresa }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-user-group"></i>
+                        No hay clientes registrados.
+                    </div>
+                {% endif %}
+            </div>
         </div>
-    </form>
+
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-lightbulb"></i> Recomendaciones</h3>
+            </div>
+
+            <div class="card-body">
+                <div class="pedido-create-note">
+                    Este paso solo crea la cabecera del pedido. Los productos, cantidades y total
+                    se agregan después dentro del detalle del pedido.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-file-circle-plus"></i> Alta de pedido</h3>
+        </div>
+
+        <div class="card-body">
+            <form action="{{ url_for('nuevo_pedido') }}" method="POST">
+                <div class="form-grid cols-2">
+                    <div class="field">
+                        <label for="id_cliente">Seleccionar cliente</label>
+                        <select id="id_cliente" name="id_cliente" class="select" required>
+                            <option value="" disabled selected>Busca un cliente...</option>
+                            {% for cliente in clientes %}
+                                <option value="{{ cliente.id_cliente }}">
+                                    {{ cliente.nombre_contacto }} - {{ cliente.empresa }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="field" style="display:flex; align-items:flex-end;">
+                        <button type="submit" class="btn btn-primary" style="width:100%;">
+                            <i class="fas fa-plus"></i>
+                            Crear pedido
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                    <a href="{{ url_for('lista_pedidos') }}" class="btn btn-secondary">
+                        <i class="fas fa-xmark"></i>
+                        Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

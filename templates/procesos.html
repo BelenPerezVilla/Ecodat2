@@ -1,96 +1,361 @@
 {% extends "base.html" %}
 
-{% block title %}Procesos de Fabricación - Ecodata{% endblock %}
+{% block title %}Procesos de Fabricación - EcoData{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del módulo de procesos de fabricación.
+    */
+    .production-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .production-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .production-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .production-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .process-name {
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .process-meta {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-top: 4px;
+    }
+
+    .production-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+
+    .field-help {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    input, select { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
-    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
-    .btn-add { background-color: #007bff; }
-    .btn-finish { background-color: #28a745; text-decoration: none; padding: 6px 12px; font-size: 0.9em; border-radius: 4px; color: white; display: inline-block;}
-    .btn-finish:hover { background-color: #218838; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-    th { background-color: #343a40; color: white; }
-    tr:nth-child(even) { background-color: #f2f2f2; }
-    
-    /* Etiquetas visuales para el estado */
-    .badge { padding: 5px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; color: white; }
-    .bg-warning { background-color: #ffc107; color: #212529; }
-    .bg-success { background-color: #28a745; }
-</style>
+<!--
+    Propósito:
+    Encabezado del módulo de producción.
+-->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Procesos de fabricación</h1>
+        <p class="page-subtitle">
+            Inicia, monitorea y finaliza procesos productivos usando materia prima registrada y producto destino.
+        </p>
+    </div>
 
-<div class="card">
-    <h4>Iniciar Nuevo Proceso de Fabricación</h4>
-    <form action="/procesos" method="POST">
-        <input type="text" name="nombre_proceso" placeholder="Nombre (Ej. Fundición de palas lote A)" required style="width: 280px;">
-        
-        <select name="id_inventario_m" required style="width: 280px;">
-            <option value="">-- Lote de Materia Prima --</option>
-            {% for metal in metales %}
-                <option value="{{ metal.id_inventario_m }}">
-                    Lote #{{ metal.id_inventario_m }} - {{ metal.tipo_metal }} ({{ metal.cantidad_kg }} kg)
-                </option>
-            {% endfor %}
-        </select>
-        
-        <select name="id_producto" required style="width: 220px;">
-            <option value="">-- Producto a Fabricar --</option>
-            {% for prod in productos %}
-                <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
-            {% endfor %}
-        </select>
-        
-        <input type="date" name="fecha_inicio" required title="Fecha de Inicio">
-        
-        <button type="submit" class="btn btn-add">Iniciar Proceso</button>
-    </form>
+    <a href="/maquinaria" class="btn btn-secondary">
+        <i class="fas fa-screwdriver-wrench"></i>
+        Ver maquinaria
+    </a>
 </div>
 
-<div class="card">
-    <h4>Control de Producción</h4>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nombre del Proceso</th>
-                <th>Materia Prima Usada</th>
-                <th>Producto Destino</th>
-                <th>Fecha Inicio</th>
-                <th>Estado</th>
-                <th>Acción</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for proceso in procesos %}
-            <tr>
-                <td>{{ proceso.id_proceso }}</td>
-                <td><strong>{{ proceso.nombre_proceso }}</strong></td>
-                
-                <td>{{ proceso.metal.tipo_metal if proceso.metal else 'ID: ' ~ proceso.id_inventario_m }}</td>
-                <td>{{ proceso.producto_final.nombre_producto if proceso.producto_final else 'ID: ' ~ proceso.id_producto }}</td>
-                
-                <td>{{ proceso.fecha_inicio }}</td>
-                <td>
-                    {% if proceso.estado == 'En progreso' %}
-                        <span class="badge bg-warning">{{ proceso.estado }}</span>
-                    {% else %}
-                        <span class="badge bg-success">{{ proceso.estado }}</span>
-                    {% endif %}
-                </td>
-                <td>
-                    {% if proceso.estado == 'En progreso' %}
-                        <a href="/finalizar_proceso/{{ proceso.id_proceso }}" class="btn-finish">✔ Finalizar</a>
-                    {% else %}
-                        <span style="color: #6c757d; font-size: 0.9em;">Terminado</span>
-                    {% endif %}
-                </td>
-            </tr>
+<!--
+    Propósito:
+    KPIs principales del módulo.
+-->
+{% set procesos_en_progreso = procesos | selectattr('estado', 'equalto', 'En progreso') | list %}
+{% set procesos_finalizados = procesos | rejectattr('estado', 'equalto', 'En progreso') | list %}
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Procesos totales</div>
+        <div class="kpi-value">{{ procesos|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">En progreso</div>
+        <div class="kpi-value">{{ procesos_en_progreso|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Finalizados</div>
+        <div class="kpi-value">{{ procesos_finalizados|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Lotes disponibles</div>
+        <div class="kpi-value">{{ metales|length }}</div>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Resumen operativo rápido del módulo.
+-->
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-industry"></i> Estado operativo</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="production-summary">
+                <div class="production-summary-item">
+                    <div>
+                        <strong>Procesos activos</strong>
+                        <span>Órdenes que siguen en ejecución</span>
+                    </div>
+                    <span class="badge badge-warning">{{ procesos_en_progreso|length }}</span>
+                </div>
+
+                <div class="production-summary-item">
+                    <div>
+                        <strong>Procesos cerrados</strong>
+                        <span>Producción que ya fue concluida</span>
+                    </div>
+                    <span class="badge badge-success">{{ procesos_finalizados|length }}</span>
+                </div>
+
+                <div class="production-summary-item">
+                    <div>
+                        <strong>Productos disponibles</strong>
+                        <span>Opciones de fabricación configuradas</span>
+                    </div>
+                    <span class="badge badge-info">{{ productos|length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones operativas</h3>
+        </div>
+
+        <div class="card-body">
+            {% if metales and productos %}
+                <div class="production-empty-note">
+                    Puedes iniciar procesos nuevos usando los lotes de materia prima disponibles y
+                    asignarlos directamente al producto final que se desea fabricar. Mantén cerrados
+                    los procesos terminados para que el control visual del módulo siga claro.
+                </div>
             {% else %}
-            <tr><td colspan="7" style="text-align: center; color: #6c757d;">No hay procesos activos o en el historial.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                <div class="production-empty-note">
+                    Antes de iniciar procesos, asegúrate de tener materia prima en inventario y al menos
+                    un producto registrado en el catálogo.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Formulario para iniciar un nuevo proceso de fabricación.
+    Se respetan los nombres originales del backend:
+    - nombre_proceso
+    - id_inventario_m
+    - id_producto
+    - fecha_inicio
+-->
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-play-circle"></i> Iniciar nuevo proceso de fabricación</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="/procesos" method="POST">
+            <div class="form-grid cols-4">
+                <div class="field">
+                    <label for="nombre_proceso">Nombre del proceso</label>
+                    <input
+                        id="nombre_proceso"
+                        type="text"
+                        name="nombre_proceso"
+                        class="input"
+                        placeholder="Ej. Fundición de palas lote A"
+                        required
+                    />
+                    <div class="field-help">
+                        Usa un nombre claro para identificar rápido el lote o la corrida.
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="id_inventario_m">Lote de materia prima</label>
+                    <select id="id_inventario_m" name="id_inventario_m" class="select" required>
+                        <option value="" disabled selected>Selecciona un lote...</option>
+                        {% for metal in metales %}
+                            <option value="{{ metal.id_inventario_m }}">
+                                Lote #{{ metal.id_inventario_m }} · {{ metal.tipo_metal }} · {{ metal.cantidad_kg }} kg
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="id_producto">Producto a fabricar</label>
+                    <select id="id_producto" name="id_producto" class="select" required>
+                        <option value="" disabled selected>Selecciona un producto...</option>
+                        {% for prod in productos %}
+                            <option value="{{ prod.id_producto }}">
+                                {{ prod.nombre_producto }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="fecha_inicio">Fecha de inicio</label>
+                    <input
+                        id="fecha_inicio"
+                        type="date"
+                        name="fecha_inicio"
+                        class="input"
+                        required
+                    />
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-circle-play"></i>
+                    Iniciar proceso
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Tabla principal de control de producción.
+-->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-clipboard-list"></i> Control de producción</h3>
+        <span class="badge badge-neutral">{{ procesos|length }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+        <div class="table-shell">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Proceso</th>
+                        <th>Materia prima usada</th>
+                        <th>Producto destino</th>
+                        <th>Fecha inicio</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for proceso in procesos %}
+                        <tr>
+                            <td>
+                                <strong>#{{ proceso.id_proceso }}</strong>
+                            </td>
+
+                            <td>
+                                <div class="process-name">{{ proceso.nombre_proceso }}</div>
+                                <div class="process-meta">
+                                    Registro de producción
+                                </div>
+                            </td>
+
+                            <td>
+                                {% if proceso.metal %}
+                                    <strong>{{ proceso.metal.tipo_metal }}</strong><br>
+                                    <span style="color:#64748b; font-size:0.86rem;">
+                                        Lote #{{ proceso.id_inventario_m }}
+                                    </span>
+                                {% else %}
+                                    <span style="color:#64748b;">
+                                        ID: {{ proceso.id_inventario_m }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if proceso.producto_final %}
+                                    <strong>{{ proceso.producto_final.nombre_producto }}</strong>
+                                {% else %}
+                                    <span style="color:#64748b;">
+                                        ID: {{ proceso.id_producto }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if proceso.fecha_inicio %}
+                                    {{ proceso.fecha_inicio.strftime('%d/%m/%Y') if proceso.fecha_inicio.strftime else proceso.fecha_inicio }}
+                                {% else %}
+                                    N/D
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if proceso.estado == 'En progreso' %}
+                                    <span class="badge badge-warning">En progreso</span>
+                                {% else %}
+                                    <span class="badge badge-success">{{ proceso.estado }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if proceso.estado == 'En progreso' %}
+                                    <a
+                                        href="/finalizar_proceso/{{ proceso.id_proceso }}"
+                                        class="btn btn-success btn-sm"
+                                    >
+                                        <i class="fas fa-check"></i>
+                                        Finalizar
+                                    </a>
+                                {% else %}
+                                    <span class="badge badge-success">Terminado</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="fas fa-industry"></i>
+                                    No hay procesos activos ni historial registrado todavía.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}
