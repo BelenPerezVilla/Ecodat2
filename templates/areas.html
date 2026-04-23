@@ -1,64 +1,279 @@
 {% extends "base.html" %}
 
-{% block title %}Gestión de Áreas{% endblock %}
+{% block title %}Áreas - EcoData{% endblock %}
+
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del módulo de áreas.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <span>Áreas</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del módulo de áreas.
+    */
+    .area-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #eef6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+
+    .area-id {
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .areas-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .areas-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .areas-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .areas-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .areas-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-    .panel-formulario { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .form-grid { display: flex; gap: 15px; align-items: end; flex-wrap: wrap; }
-    
-    .input-group { display: flex; flex-direction: column; flex-grow: 1; }
-    .input-group label { font-weight: bold; margin-bottom: 5px; color: #4a5568; font-size: 0.9rem; }
-    .input-group input { padding: 10px; border: 1px solid #cbd5e0; border-radius: 4px; }
-    
-    .btn-guardar { background-color: #3182ce; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; height: 40px; white-space: nowrap;}
-    .btn-guardar:hover { background-color: #2b6cb0; }
+{% set total_areas = areas|length %}
 
-    .tabla-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow-x: auto;}
-    .tabla-areas { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-    .tabla-areas th { background-color: #edf2f7; color: #4a5568; padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e0; }
-    .tabla-areas td { padding: 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; }
-    .tabla-areas tr:hover { background-color: #f7fafc; }
-</style>
-
-<div style="margin-bottom: 20px;">
-    <h2 style="color: #2d3748; margin-top: 0;"><i class="fas fa-building"></i> Departamentos y Áreas</h2>
-    <p style="color: #718096; margin-top: 5px;">Registra las diferentes áreas de tu empresa (Ej. Ventas, Calidad, Almacén) para poder asignar a tu personal.</p>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Áreas y departamentos</h1>
+        <p class="page-subtitle">
+            Administra las áreas internas del sistema y mantén organizada la estructura operativa.
+        </p>
+    </div>
 </div>
 
-<div class="panel-formulario">
-    <h3 style="margin-top: 0; color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">Nueva Área</h3>
-    <form action="/areas" method="POST" class="form-grid">
-        
-        <div class="input-group">
-            <label>Nombre del Departamento / Área</label>
-            <input type="text" name="nombre_area" placeholder="Ej. Control de Calidad" required>
+<div class="grid grid-3" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Áreas registradas</div>
+        <div class="kpi-value">{{ total_areas }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Estructura</div>
+        <div class="kpi-value">Activa</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Módulo</div>
+        <div class="kpi-value">Personal</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    {% if puede('areas.crear') %}
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-plus-circle"></i> Registrar nueva área</h3>
         </div>
 
-        <button type="submit" class="btn-guardar"><i class="fas fa-save"></i> Guardar Área</button>
-    </form>
+        <div class="card-body">
+            <form action="{{ url_for('areas') }}" method="POST">
+                <div class="field" style="margin-bottom: 16px;">
+                    <label for="nombre_area" class="required">Nombre del área</label>
+                    <input
+                        id="nombre_area"
+                        type="text"
+                        name="nombre_area"
+                        class="input"
+                        placeholder="Ej. Producción"
+                        required
+                    />
+                </div>
+
+                <button type="submit" class="btn btn-primary" data-loading-text="Guardando...">
+                    <i class="fas fa-floppy-disk"></i>
+                    Guardar área
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-building"></i> Resumen de estructura</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="areas-summary">
+                <div class="areas-summary-item">
+                    <div>
+                        <strong>Total de áreas</strong>
+                        <span>Departamentos activos del sistema</span>
+                    </div>
+                    <span class="badge badge-info">{{ total_areas }}</span>
+                </div>
+
+                <div class="areas-summary-item">
+                    <div>
+                        <strong>Uso recomendado</strong>
+                        <span>Asocia usuarios y permisos por área</span>
+                    </div>
+                    <span class="badge badge-success">Organizado</span>
+                </div>
+
+                <div class="areas-summary-item">
+                    <div>
+                        <strong>Control administrativo</strong>
+                        <span>Ideal para personal, privilegios y reportes</span>
+                    </div>
+                    <span class="badge badge-neutral">Disponible</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="tabla-container">
-    <table class="tabla-areas">
-        <thead>
-            <tr>
-                <th style="width: 80px;">ID</th>
-                <th>Nombre del Área</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for area in areas %}
-            <tr>
-                <td><strong>#{{ area.id_area }}</strong></td>
-                <td>{{ area.nombre_area }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="2" style="text-align: center; color: #718096; padding: 20px;">Aún no has registrado ningún área.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-lightbulb"></i> Recomendación</h3>
+    </div>
+
+    <div class="card-body">
+        <div class="areas-note">
+            Usa nombres claros y únicos para cada área. Esto ayuda a organizar personal,
+            accesos y reportes administrativos sin duplicidades.
+        </div>
+    </div>
 </div>
+
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-list"></i> Listado de áreas</h3>
+        <span class="badge badge-neutral">{{ total_areas }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding:0;">
+        <div class="table-tools">
+            <div class="table-filters">
+                <div class="filtro-input-wrap">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <input
+                        id="filtroAreasTexto"
+                        type="text"
+                        class="input"
+                        placeholder="Buscar por ID o nombre del área"
+                    />
+                </div>
+
+                <button type="button" class="btn btn-outline" id="limpiarAreasFiltros">
+                    <i class="fas fa-rotate-left"></i>
+                    Limpiar
+                </button>
+            </div>
+
+            <div class="toolbar-counter" id="contadorAreas">{{ total_areas }} resultados</div>
+        </div>
+
+        <div class="table-shell">
+            <table class="table" id="tablaAreas">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre del área</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for area in areas %}
+                    <tr
+                        class="js-filter-row"
+                        data-search="{{ (area.id_area|string ~ ' ' ~ area.nombre_area)|lower }}"
+                    >
+                        <td>
+                            <span class="area-id">#{{ area.id_area }}</span>
+                        </td>
+                        <td>
+                            <span class="area-chip">
+                                <i class="fas fa-building"></i>
+                                {{ area.nombre_area }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2">
+                            <div class="empty-state">
+                                <i class="fas fa-building-circle-xmark"></i>
+                                No hay áreas registradas todavía.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="emptyAreasDynamic" class="results-empty-inline">
+            <div class="empty-state">
+                <i class="fas fa-filter-circle-xmark"></i>
+                No hay áreas que coincidan con la búsqueda.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    /*
+        Propósito:
+        Inicializar filtros del módulo de áreas.
+    */
+    document.addEventListener("DOMContentLoaded", function () {
+        initSmartTableFilters({
+            tableId: "tablaAreas",
+            textInputId: "filtroAreasTexto",
+            counterId: "contadorAreas",
+            emptyStateId: "emptyAreasDynamic",
+            clearButtonId: "limpiarAreasFiltros"
+        });
+    });
+</script>
 {% endblock %}

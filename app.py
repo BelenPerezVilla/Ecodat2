@@ -1,27 +1,35 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
-from models import db, Area, InicioLog, Proveedor, Almacen, Producto, InventarioMetal, InventarioProducto, Proceso, Transaccion, Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad, Vehiculo, Chofer, Envio, ProcesoReciclaje, Embarque, Maquinaria, Compra, PedidoVenta, DetallePedido, Auditoria
+# ==========================================================
+# IMPORTS PRINCIPALES
+# Propósito:
+# - Mantener imports limpios
+# - Evitar duplicados
+# - Incluir lo necesario para permisos, auditoría y exports
+# ==========================================================
+from flask import (
+    Flask, render_template, request, redirect, url_for,
+    session, flash, make_response, send_file, abort
+)
+from models import (
+    db, Area, InicioLog, Proveedor, Almacen, Producto,
+    InventarioMetal, InventarioProducto, Proceso, Transaccion,
+    Cliente, Venta, RolUsuario, Mantenimiento, Maquina, Calidad,
+    Vehiculo, Chofer, Envio, ProcesoReciclaje, Embarque,
+    Maquinaria, Compra, PedidoVenta, DetallePedido, Auditoria
+)
+
 from urllib.parse import quote_plus
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
-import os
-from datetime import date
-from datetime import datetime, timedelta, timedelta
-from sqlalchemy import func, or_, cast, String
+from functools import wraps
+from datetime import date, datetime, timedelta
+from sqlalchemy import func, or_, cast, String, extract, inspect
 from fpdf import FPDF
-from flask import make_response
-from sqlalchemy import func, extract, inspect
+from io import BytesIO
+import os
 import csv
 import io
-from flask import make_response
 import json
-from sqlalchemy import func
 import pandas as pd
-from io import BytesIO
-from flask import send_file 
-from functools import wraps
-from flask import session, redirect, url_for, flash 
-from fpdf import FPDF
 
 app = Flask(__name__)
 app.secret_key = 'hola123' # Necesario para las sesiones
@@ -37,389 +45,128 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 # ==========================================================
-# BLOQUE CENTRAL 3A: Permisos + auditoría
+# HELPERS GENERALES
 # Propósito:
-# - Resolver permisos por rol
-# - Reutilizar registrar_log(...)
-# - Proteger rutas con decoradores
-# - Exponer puede(...) a los templates
+# - Funciones auxiliares para dashboard y auditoría
 # ==========================================================
-
-# ----------------------------------------------------------
-# Helper:
-# genera permisos tipo "modulo.*"
-# ----------------------------------------------------------
-def permisos_modulos(*modulos):
-    permisos = set()
-    for modulo in modulos:
-        permisos.add(f"{modulo}.*")
-    return permisos
+def modelo_tiene_columna(modelo, nombre_columna):
+    """
+    Verifica si un modelo SQLAlchemy tiene una columna concreta.
+    """
+    return nombre_columna in [c.key for c in inspect(modelo).mapper.column_attrs]
 
 
-# ----------------------------------------------------------
-# Alias de roles:
-# normaliza nombres distintos que puedan existir en tu tabla.
-# ----------------------------------------------------------
-ROLE_ALIASES = {
-    "ADMINISTRADOR": "ADMIN",
-    "ADMIN": "ADMIN",
-    "ROOT": "ADMIN",
-
-    "SUPERVISOR": "SUPERVISOR",
-
-    "OPERADOR": "OPERADOR",
-
-    "COMPRAS": "COMPRAS",
-    "VENTAS": "VENTAS",
-    "LOGISTICA": "LOGISTICA",
-    "PRODUCCION": "PRODUCCION",
-    "MANTENIMIENTO": "MANTENIMIENTO",
-    "CALIDAD": "CALIDAD"
-}
-
-
-# ----------------------------------------------------------
-# Matriz principal de permisos
-# Formato:
-# - modulo.ver
-# - modulo.crear
-# - modulo.editar
-# - modulo.eliminar
-# - modulo.exportar
-# - modulo.*
-# - *
-# ----------------------------------------------------------
-PERMISSION_MATRIX = {
-    "ADMIN": {"*"},
-
-    "SUPERVISOR": (
-        permisos_modulos(
-            "dashboard",
-            "productos",
-            "inventario_productos",
-            "inventario",
-            "almacenes",
-            "procesos",
-            "reciclaje",
-            "maquinaria",
-            "mantenimiento",
-            "alertas",
-            "transporte",
-            "vehiculos",
-            "choferes",
-            "embarques",
-            "dispatch",
-            "calidad",
-            "reportes_calidad",
-            "compras",
-            "proveedores",
-            "historial_compras",
-            "dash_comercial",
-            "clientes",
-            "ventas",
-            "contabilidad",
-            "pedidos",
-            "areas",
-            "personal",
-            "auditoria"
-        )
-        |
-        {
-            "privilegios.ver"
-        }
-    ),
-
-    "OPERADOR": {
-        "dashboard.ver",
-        "pedidos.ver",
-        "pedidos.crear",
-        "ventas.ver",
-        "clientes.ver",
-        "transporte.ver",
-        "embarques.ver",
-        "inventario.ver",
-        "productos.ver",
-        "productos.editar"
-    },
-
-    "COMPRAS": (
-        permisos_modulos(
-            "dashboard",
-            "compras",
-            "proveedores",
-            "historial_compras"
-        )
-        |
-        {
-            "inventario.ver",
-            "embarques.ver"
-        }
-    ),
-
-    "VENTAS": (
-        permisos_modulos(
-            "dashboard",
-            "clientes",
-            "ventas",
-            "pedidos",
-            "dash_comercial"
-        )
-    ),
-
-    "LOGISTICA": (
-        permisos_modulos(
-            "dashboard",
-            "transporte",
-            "dispatch",
-            "vehiculos",
-            "choferes",
-            "embarques"
-        )
-        |
-        {
-            "pedidos.ver",
-            "ventas.ver",
-            "clientes.ver"
-        }
-    ),
-
-    "PRODUCCION": (
-        permisos_modulos(
-            "dashboard",
-            "procesos",
-            "reciclaje",
-            "maquinaria"
-        )
-        |
-        {
-            "inventario.ver",
-            "inventario_productos.ver",
-            "productos.ver"
-        }
-    ),
-
-    "MANTENIMIENTO": (
-        permisos_modulos(
-            "dashboard",
-            "mantenimiento",
-            "alertas"
-        )
-        |
-        {
-            "maquinaria.ver"
-        }
-    ),
-
-    "CALIDAD": (
-        permisos_modulos(
-            "dashboard",
-            "calidad",
-            "reportes_calidad"
-        )
-    )
-}
-
-
-# ----------------------------------------------------------
-# Helper:
-# normaliza el rol guardado en sesión.
-# ----------------------------------------------------------
-def obtener_rol_normalizado():
-    rol = (session.get("rol") or "OPERADOR").strip().upper()
-    return ROLE_ALIASES.get(rol, rol)
-
-
-# ----------------------------------------------------------
-# Helper:
-# revisa si el rol actual tiene permiso.
-# ----------------------------------------------------------
-def tiene_permiso(permiso):
-    rol_actual = obtener_rol_normalizado()
-    permisos_rol = PERMISSION_MATRIX.get(rol_actual, set())
-
-    # Acceso total para admin.
-    if "*" in permisos_rol:
-        return True
-
-    # Coincidencia exacta.
-    if permiso in permisos_rol:
-        return True
-
-    # Coincidencia por comodín de módulo.
-    if "." in permiso:
-        modulo = permiso.split(".")[0]
-        if f"{modulo}.*" in permisos_rol:
-            return True
-
-    return False
-
-
-# ----------------------------------------------------------
-# Helper:
-# auditoría central reutilizando registrar_log(...)
-# ----------------------------------------------------------
-def registrar_auditoria(modulo, accion, detalle=""):
+def registrar_log(accion, modulo, detalle):
+    """
+    Registra movimiento en la tabla Auditoria usando mapeo dinámico
+    para no depender de nombres fijos más allá de los más comunes.
+    """
     try:
-        usuario = session.get("usuario", "Sistema")
-        rol = session.get("rol", "Sin rol")
-        ruta = request.path if request else "N/D"
-        metodo = request.method if request else "N/D"
-        ip = request.remote_addr if request else "N/D"
+        registro = Auditoria()
+        columnas = {c.key for c in inspect(Auditoria).mapper.column_attrs}
+        ahora = datetime.now()
+        usuario_actual = session.get('usuario', 'Sistema')
 
-        descripcion = (
-            f"Usuario={usuario} | Rol={rol} | Acción={accion} | "
-            f"Módulo={modulo} | Método={metodo} | Ruta={ruta} | IP={ip}"
-        )
+        # ----------------------------------------------
+        # Campos comunes del modelo Auditoria
+        # ----------------------------------------------
+        if 'accion' in columnas:
+            registro.accion = accion
 
-        if detalle:
-            descripcion += f" | Detalle={detalle}"
+        if 'modulo' in columnas:
+            registro.modulo = modulo
 
-        # Reutiliza tu bitácora existente.
-        registrar_log(accion, modulo, descripcion)
+        if 'detalle' in columnas:
+            registro.detalle = detalle
+        elif 'descripcion' in columnas:
+            registro.descripcion = detalle
+        elif 'mensaje' in columnas:
+            registro.mensaje = detalle
+
+        if 'usuario' in columnas:
+            registro.usuario = usuario_actual
+        elif 'nombre_usuario' in columnas:
+            registro.nombre_usuario = usuario_actual
+
+        if 'fecha' in columnas:
+            registro.fecha = ahora
+        elif 'fecha_registro' in columnas:
+            registro.fecha_registro = ahora
+        elif 'created_at' in columnas:
+            registro.created_at = ahora
+
+        if 'ruta' in columnas:
+            registro.ruta = request.path if request else None
+
+        if 'metodo' in columnas:
+            registro.metodo = request.method if request else None
+
+        if 'ip' in columnas:
+            registro.ip = request.remote_addr if request else None
+
+        db.session.add(registro)
+        db.session.commit()
 
     except Exception as e:
-        # No romper la operación si falla la auditoría.
-        print(f"[AUDITORIA] No se pudo registrar la acción: {e}")
+        db.session.rollback()
+        print(f"[AUDITORIA] Error al guardar bitácora: {e}")
 
-
-# ----------------------------------------------------------
-# Decorador:
-# protege rutas completas por permiso.
-# Uso:
-# @requiere_permiso('ventas.ver')
-# ----------------------------------------------------------
-def requiere_permiso(permiso):
-    def decorator(view_func):
-        @wraps(view_func)
-        def wrapped_view(*args, **kwargs):
-            # Validación de sesión.
-            if "usuario" not in session:
-                return redirect(url_for("login"))
-
-            # Validación de permiso.
-            if not tiene_permiso(permiso):
-                registrar_auditoria(
-                    modulo="Seguridad",
-                    accion="Acceso denegado",
-                    detalle=f"Permiso requerido: {permiso}"
-                )
-                flash("No tienes permisos para acceder a este módulo.", "danger")
-                return redirect(url_for("dashboard"))
-
-            return view_func(*args, **kwargs)
-        return wrapped_view
-    return decorator
-
-
-# ----------------------------------------------------------
-# Helper:
-# valida permisos para acciones dentro de una ruta POST.
-# Ejemplo:
-# if not validar_permiso_accion('ventas.crear', 'Ventas', 'Crear venta'):
-#     return redirect(url_for('ventas'))
-# ----------------------------------------------------------
-def validar_permiso_accion(permiso, modulo, accion, detalle=""):
-    if not tiene_permiso(permiso):
-        registrar_auditoria(
-            modulo=modulo,
-            accion=f"Bloqueado: {accion}",
-            detalle=f"Permiso faltante: {permiso}. {detalle}"
-        )
-        flash("No tienes permisos para realizar esta acción.", "danger")
-        return False
-    return True
-
-
-# ----------------------------------------------------------
-# Context processor:
-# expone helpers a todos los templates.
-# Uso en Jinja:
-# {% if puede('ventas.ver') %}
-# ----------------------------------------------------------
-@app.context_processor
-def inject_permission_helpers():
-    return {
-        "puede": tiene_permiso
-    }
 
 # ==========================================================
-# SEGURIDAD 3A: Carga de rol, permisos y decoradores
+# SEGURIDAD Y PERMISOS
 # Propósito:
-# - Mantener compatibilidad con tu sistema actual
-# - Extender de Administrador/Operador a permisos por módulo
-# - Reutilizar la tabla RolUsuario y la bitácora Auditoria
+# - Manejar permisos por rol
+# - Evitar bucles de redirección
+# - Reutilizar la tabla RolUsuario
 # ==========================================================
-
-# ----------------------------------------------------------
-# BEFORE REQUEST:
-# Cargar rol del usuario desde la base en cada request.
-# ----------------------------------------------------------
 @app.before_request
 def cargar_rol():
+    """
+    Carga el rol del usuario desde la base en cada request.
+    """
     if 'usuario' in session:
         rol_db = RolUsuario.query.filter_by(nombre_usuario=session['usuario']).first()
-        session['rol'] = rol_db.rol if rol_db else 'Administrador'
+        session['rol'] = rol_db.rol if rol_db else 'Operador'
 
 
-# ----------------------------------------------------------
-# MATRIZ DE PERMISOS:
-# Ajustada a los nombres reales de tu proyecto.
-# Roles actuales del zip:
-# - Administrador
-# - Operador
-# Puedes agregar luego más roles desde Privilegios.
-# ----------------------------------------------------------
 PERMISSION_MATRIX = {
-    "Administrador": {
-        "*"
-    },
+    "Administrador": {"*"},
 
     "Supervisor": {
         "dashboard.ver",
-
         "productos.ver", "productos.crear", "productos.editar",
-        "inventario.ver", "inventario.exportar",
-        "inventario_productos.ver",
-
+        "inventario.ver", "inventario_productos.ver", "almacenes.ver",
         "procesos.ver", "procesos.crear", "procesos.editar",
         "reciclaje.ver", "maquinaria.ver",
-
         "mantenimiento.ver", "mantenimiento.crear", "mantenimiento.editar",
         "alertas.ver",
-
         "transporte.ver", "transporte.crear", "transporte.editar",
-        "vehiculos.ver", "choferes.ver", "embarques.ver",
-        "dispatch.ver",
-
+        "vehiculos.ver", "choferes.ver", "embarques.ver", "dispatch.ver",
         "calidad.ver", "reportes_calidad.ver",
-
         "compras.ver", "compras.crear", "proveedores.ver", "historial_compras.ver",
-
         "clientes.ver", "clientes.crear", "clientes.editar",
-        "ventas.ver", "ventas.crear", "dash_comercial.ver",
+        "ventas.ver", "ventas.crear",
+        "dash_comercial.ver",
         "pedidos.ver", "pedidos.crear", "pedidos.editar",
-
-        "areas.ver", "personal.ver",
+        "areas.ver", "areas.crear",
+        "personal.ver",
+        "privilegios.ver",
         "auditoria.ver"
     },
 
     "Operador": {
         "dashboard.ver",
-
         "productos.ver",
         "inventario.ver",
         "inventario_productos.ver",
-
         "procesos.ver",
         "reciclaje.ver",
         "maquinaria.ver",
-
         "transporte.ver",
-        "embarques.ver",
-        "dispatch.ver",
         "vehiculos.ver",
         "choferes.ver",
-
+        "embarques.ver",
+        "dispatch.ver",
         "clientes.ver",
         "ventas.ver",
         "pedidos.ver"
@@ -436,22 +183,32 @@ PERMISSION_MATRIX = {
 
     "Ventas": {
         "dashboard.ver",
+        "dash_comercial.ver",
         "clientes.ver", "clientes.crear", "clientes.editar",
         "ventas.ver", "ventas.crear",
-        "pedidos.ver", "pedidos.crear", "pedidos.editar",
-        "dash_comercial.ver"
+        "pedidos.ver", "pedidos.crear", "pedidos.editar"
     },
 
     "Logistica": {
         "dashboard.ver",
         "transporte.ver", "transporte.crear", "transporte.editar",
-        "dispatch.ver",
         "vehiculos.ver",
         "choferes.ver",
         "embarques.ver",
-        "ventas.ver",
+        "dispatch.ver",
         "clientes.ver",
+        "ventas.ver",
         "pedidos.ver"
+    },
+
+    "Produccion": {
+        "dashboard.ver",
+        "productos.ver",
+        "inventario.ver",
+        "inventario_productos.ver",
+        "procesos.ver", "procesos.crear", "procesos.editar",
+        "reciclaje.ver",
+        "maquinaria.ver"
     },
 
     "Mantenimiento": {
@@ -459,46 +216,48 @@ PERMISSION_MATRIX = {
         "mantenimiento.ver", "mantenimiento.crear", "mantenimiento.editar",
         "alertas.ver",
         "maquinaria.ver"
+    },
+
+    "Calidad": {
+        "dashboard.ver",
+        "calidad.ver",
+        "reportes_calidad.ver"
     }
 }
 
 
-# ----------------------------------------------------------
-# HELPER:
-# Revisar si el usuario actual tiene un permiso concreto.
-# ----------------------------------------------------------
 def tiene_permiso(permiso):
-    rol_actual = session.get("rol", "Operador")
+    """
+    Verifica si el rol actual tiene un permiso concreto.
+    """
+    rol_actual = (session.get("rol") or "Operador").strip()
     permisos_rol = PERMISSION_MATRIX.get(rol_actual, set())
 
-    # Administrador total
     if "*" in permisos_rol:
         return True
 
-    # Coincidencia exacta
-    if permiso in permisos_rol:
-        return True
-
-    return False
+    return permiso in permisos_rol
 
 
-# ----------------------------------------------------------
-# HELPER:
-# Reutiliza tu bitácora actual, pero con formato uniforme.
-# ----------------------------------------------------------
 def registrar_auditoria(modulo, accion, detalle=""):
+    """
+    Wrapper central de auditoría.
+    """
     try:
-        usuario = session.get('usuario', 'Sistema')
-        registrar_log(accion, modulo, f"Usuario={usuario} | {detalle}")
+        usuario = session.get("usuario", "Sistema")
+        registrar_log(
+            accion,
+            modulo,
+            f"Usuario={usuario} | Detalle={detalle}"
+        )
     except Exception as e:
         print(f"[AUDITORIA] No se pudo registrar movimiento: {e}")
 
 
-# ----------------------------------------------------------
-# DECORADOR:
-# Protege rutas por permiso concreto.
-# ----------------------------------------------------------
 def requiere_permiso(permiso):
+    """
+    Decorador para proteger rutas por permiso.
+    """
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -507,11 +266,6 @@ def requiere_permiso(permiso):
                 return redirect(url_for('login'))
 
             if not tiene_permiso(permiso):
-                registrar_auditoria(
-                    "Seguridad",
-                    "Acceso Denegado",
-                    f"Permiso requerido: {permiso} | Ruta: {request.path}"
-                )
                 flash("No tienes permisos para acceder a este módulo.", "error")
                 return redirect(url_for('dashboard'))
 
@@ -520,11 +274,11 @@ def requiere_permiso(permiso):
     return decorator
 
 
-# ----------------------------------------------------------
-# HELPER:
-# Validar acciones dentro de rutas POST.
-# ----------------------------------------------------------
-def validar_permiso_accion(permiso, modulo, accion, redireccion):
+def validar_permiso_accion(permiso, modulo, accion, endpoint_redireccion):
+    """
+    Valida permisos para acciones POST.
+    Retorna un redirect o None.
+    """
     if not tiene_permiso(permiso):
         registrar_auditoria(
             modulo,
@@ -532,15 +286,14 @@ def validar_permiso_accion(permiso, modulo, accion, redireccion):
             f"Permiso faltante: {permiso}"
         )
         flash("No tienes permisos para realizar esta acción.", "error")
-        return redirect(url_for(redireccion))
+        return redirect(url_for(endpoint_redireccion))
     return None
 
 
-# ----------------------------------------------------------
-# DECORADOR DE ADMIN:
-# Se conserva por compatibilidad con lo que ya tienes.
-# ----------------------------------------------------------
 def admin_required(f):
+    """
+    Decorador de compatibilidad para secciones exclusivas de administrador.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'usuario' not in session:
@@ -548,11 +301,6 @@ def admin_required(f):
             return redirect(url_for('login'))
 
         if session.get('rol') != 'Administrador':
-            registrar_auditoria(
-                "Seguridad",
-                "Acceso Denegado",
-                f"Intento de acceso admin-only a {request.path}"
-            )
             flash("Acceso denegado. Esta sección es exclusiva para Administradores.", "error")
             return redirect(url_for('dashboard'))
 
@@ -560,18 +308,41 @@ def admin_required(f):
     return decorated_function
 
 
-# ----------------------------------------------------------
-# CONTEXT PROCESSOR:
-# Exponer helper de permisos a los templates.
-# Uso:
-# {% if puede('ventas.ver') %}
-# ----------------------------------------------------------
 @app.context_processor
 def inject_permission_helpers():
+    """
+    Expone el helper puede(...) en todos los templates.
+    """
     return {
         "puede": tiene_permiso
     }
 
+
+@app.context_processor
+def utilidad_alertas():
+    """
+    Expone el conteo de alertas para el layout.
+    """
+    def obtener_conteo():
+        try:
+            hoy = datetime.now().date()
+            ultimos_ids = [
+                r[0] for r in db.session.query(
+                    func.max(Mantenimiento.id_mantenimiento)
+                ).group_by(Mantenimiento.id_maquina).all()
+            ]
+
+            if not ultimos_ids:
+                return 0
+
+            return Mantenimiento.query.filter(
+                Mantenimiento.fecha_proxima <= hoy,
+                Mantenimiento.id_mantenimiento.in_(ultimos_ids)
+            ).count()
+        except Exception:
+            return 0
+
+    return dict(global_alertas=obtener_conteo())
 
 
 @app.route('/auditoria')
@@ -587,6 +358,94 @@ def ver_auditoria():
 # - Validar usuario
 # - Guardar área y rol en sesión
 # - Auditar acceso correcto o fallido
+# ==========================================================
+
+# ==========================================================
+# ROUTE: Áreas
+# Propósito:
+# - Mostrar listado de áreas/departamentos
+# - Permitir alta de nuevas áreas
+# - Respetar el modelo real Area del proyecto
+# ==========================================================
+@app.route('/areas', methods=['GET', 'POST'])
+@requiere_permiso('areas.ver')
+def areas():
+    # ------------------------------------------------------
+    # POST: Registrar nueva área
+    # ------------------------------------------------------
+    if request.method == 'POST':
+        # Comentario:
+        # Validamos permiso para crear nuevas áreas.
+        permiso_error = validar_permiso_accion(
+            'areas.crear',
+            'Áreas',
+            'Crear área',
+            'areas'
+        )
+        if permiso_error:
+            return permiso_error
+
+        # Comentario:
+        # Leemos y limpiamos el nombre del área.
+        nombre_area = (request.form.get('nombre_area') or '').strip()
+
+        # Comentario:
+        # Validación básica del formulario.
+        if not nombre_area:
+            flash('Debes escribir el nombre del área.', 'error')
+            return redirect(url_for('areas'))
+
+        # Comentario:
+        # Evitamos duplicados simples por nombre.
+        existente = Area.query.filter(
+            func.lower(Area.nombre_area) == nombre_area.lower()
+        ).first()
+
+        if existente:
+            flash('Ya existe un área con ese nombre.', 'warning')
+            return redirect(url_for('areas'))
+
+        try:
+            # Comentario:
+            # Creamos y guardamos la nueva área.
+            nueva_area = Area(nombre_area=nombre_area)
+            db.session.add(nueva_area)
+            db.session.commit()
+
+            # Comentario:
+            # Registramos movimiento en auditoría.
+            registrar_auditoria(
+                "Áreas",
+                "Crear",
+                f"Área registrada: {nueva_area.nombre_area}"
+            )
+
+            flash('Área registrada correctamente.', 'success')
+
+        except Exception as e:
+            # Comentario:
+            # Si algo falla en la base, revertimos la transacción.
+            db.session.rollback()
+            flash(f'No se pudo registrar el área: {str(e)}', 'error')
+
+        return redirect(url_for('areas'))
+
+    # ------------------------------------------------------
+    # GET: Mostrar listado de áreas
+    # ------------------------------------------------------
+    areas = Area.query.order_by(Area.nombre_area.asc()).all()
+
+    return render_template(
+        'areas.html',
+        areas=areas
+    )
+
+# ==========================================================
+# ROUTE: Login
+# Propósito:
+# - Validar usuario
+# - Crear sesión
+# - Redirigir al dashboard
 # ==========================================================
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
@@ -618,23 +477,16 @@ def login():
             session['rol'] = rol_db.rol if rol_db else 'Operador'
 
             registrar_auditoria(
-                modulo="Seguridad",
-                accion="Login",
-                detalle=f"Acceso correcto del usuario {user_db.usuario}"
+                "Seguridad",
+                "Login",
+                f"Acceso correcto del usuario {user_db.usuario}"
             )
 
             return redirect(url_for('dashboard'))
 
-        else:
-            error = "Usuario o contraseña incorrectos. Intenta de nuevo."
-            registrar_auditoria(
-                modulo="Seguridad",
-                accion="Intento Fallido",
-                detalle=f"Intento de acceso fallido con usuario: {usuario_form}"
-            )
+        error = "Usuario o contraseña incorrectos. Intenta de nuevo."
 
     return render_template('login.html', error=error)
-
 # ==========================================================
 # BLOQUE: Dispatch / mapa logístico
 # Propósito:
@@ -1051,6 +903,12 @@ def personal():
 # - Cerrar sesión
 # - Registrar salida en auditoría
 # ==========================================================
+# ==========================================================
+# ROUTE: Logout
+# Propósito:
+# - Cerrar sesión
+# - Registrar salida en auditoría
+# ==========================================================
 @app.route('/logout')
 def logout():
     if 'usuario' in session:
@@ -1065,26 +923,19 @@ def logout():
 # ==========================================================
 # ROUTE: Dashboard principal
 # Propósito:
-# - Mantener la lógica real actual del proyecto
-# - Agregar KPIs operativos faltantes
-# - Evitar errores si algún modelo no tiene ciertas columnas
+# - Pantalla segura de aterrizaje tras el login
+# - Mantener KPIs y gráficas
 # ==========================================================
 @app.route('/dashboard')
-@requiere_permiso('dashboard.ver')  # Solo usuarios con permiso pueden acceder
 def dashboard():
-    # Validación de sesión.
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
-    # ======================================================
-    # 1. LÓGICA DE ALERTAS Y NOTIFICACIONES
-    # ======================================================
     alertas = []
     hoy_dt = datetime.now()
     fecha_hoy = hoy_dt.date()
     limite_mantenimiento = fecha_hoy + timedelta(days=7)
 
-    # Alerta de metales bajos (< 500kg)
     metales_bajos = InventarioMetal.query.filter(InventarioMetal.cantidad_kg <= 500).all()
     for m in metales_bajos:
         alertas.append({
@@ -1092,9 +943,6 @@ def dashboard():
             'mensaje': f"Stock crítico de {m.tipo_metal}: {m.cantidad_kg}kg restantes."
         })
 
-    # Alerta de mantenimiento próximo (próximos 7 días)
-    # Nota:
-    # Aquí se respeta tu modelo Maquinaria con campo proximo_mantenimiento.
     maquinas_prox = Maquinaria.query.filter(
         Maquinaria.proximo_mantenimiento <= limite_mantenimiento
     ).all()
@@ -1107,12 +955,8 @@ def dashboard():
             'mensaje': msg
         })
 
-    # Cantidad total de alertas abiertas para el KPI.
     alertas_abiertas = len(alertas)
 
-    # ======================================================
-    # 2. KPIs DE INVENTARIO Y PROCESOS
-    # ======================================================
     metales = InventarioMetal.query.all()
     total_kilos = sum(m.cantidad_kg for m in metales if m.cantidad_kg)
 
@@ -1121,66 +965,35 @@ def dashboard():
 
     procesos_activos = Proceso.query.filter_by(estado='En progreso').count()
 
-    # ======================================================
-    # 3. KPIs DE VENTAS
-    # ======================================================
     dinero_total = db.session.query(func.sum(PedidoVenta.total)).scalar() or 0
     pedidos_pendientes = PedidoVenta.query.filter_by(estado='Pendiente').count()
 
-    # ======================================================
-    # 4. KPIs OPERATIVOS NUEVOS
-    # ======================================================
-
-    # ------------------------------------------
-    # Choferes activos
-    # Si existe columna estado, se filtra por activos.
-    # Si no existe, se cuentan todos los choferes.
-    # ------------------------------------------
     choferes_activos = 0
     try:
         if modelo_tiene_columna(Chofer, 'estado'):
-            choferes_activos = Chofer.query.filter(
-                func.lower(Chofer.estado) == 'activo'
-            ).count()
+            choferes_activos = Chofer.query.filter(func.lower(Chofer.estado) == 'activo').count()
         else:
             choferes_activos = Chofer.query.count()
     except Exception:
         choferes_activos = 0
 
-    # ------------------------------------------
-    # Vehículos / unidades disponibles
-    # Si existe columna estado, se filtra por disponibles.
-    # Si no existe, se cuentan todos los vehículos.
-    # ------------------------------------------
     unidades_disponibles = 0
     try:
         if modelo_tiene_columna(Vehiculo, 'estado'):
-            unidades_disponibles = Vehiculo.query.filter(
-                func.lower(Vehiculo.estado) == 'disponible'
-            ).count()
+            unidades_disponibles = Vehiculo.query.filter(func.lower(Vehiculo.estado) == 'disponible').count()
         else:
             unidades_disponibles = Vehiculo.query.count()
     except Exception:
         unidades_disponibles = 0
 
-    # ------------------------------------------
-    # Envíos en tránsito
-    # Se intenta contemplar variantes con acento o sin acento.
-    # ------------------------------------------
     envios_transito = 0
     try:
         envios_transito = Envio.query.filter(
-            func.lower(Envio.estado_entrega).in_([
-                'en tránsito',
-                'en transito'
-            ])
+            func.lower(Envio.estado_entrega).in_(['en tránsito', 'en transito'])
         ).count()
     except Exception:
         envios_transito = 0
 
-    # ------------------------------------------
-    # Embarques registrados hoy
-    # ------------------------------------------
     embarques_hoy = 0
     try:
         embarques_hoy = Embarque.query.filter(
@@ -1189,9 +1002,6 @@ def dashboard():
     except Exception:
         embarques_hoy = 0
 
-    # ------------------------------------------
-    # Compras del mes actual
-    # ------------------------------------------
     compras_mes = 0
     try:
         compras_mes = Compra.query.filter(
@@ -1201,22 +1011,18 @@ def dashboard():
     except Exception:
         compras_mes = 0
 
-    # ======================================================
-    # 5. DATOS PARA LAS GRÁFICAS
-    # ======================================================
     nombres_prod = []
     cantidades_prod = []
 
     for inv in productos_inv:
         prod = Producto.query.get(inv.id_producto)
         if prod:
-            nombres_prod.append(f"{prod.nombre_producto}")
+            nombres_prod.append(prod.nombre_producto)
             cantidades_prod.append(inv.cantidad_stock)
 
-    tipos_metal = [f"{m.tipo_metal}" for m in metales]
+    tipos_metal = [m.tipo_metal for m in metales]
     kilos_metal = [float(m.cantidad_kg) for m in metales]
 
-    # Tendencia de ventas de los últimos 7 días
     hace_siete_dias = hoy_dt - timedelta(days=7)
     ventas_7_dias = db.session.query(
         func.date(PedidoVenta.fecha_pedido),
@@ -1230,36 +1036,22 @@ def dashboard():
     labels_ventas = [v[0].strftime('%d %b') for v in ventas_7_dias]
     valores_ventas = [float(v[1]) for v in ventas_7_dias]
 
-    # ======================================================
-    # 6. RENDER FINAL
-    # Propósito:
-    # - Mantener tus variables originales
-    # - Enviar también los KPIs nuevos al dashboard
-    # ======================================================
     return render_template(
         'dashboard.html',
         usuario_actual=session['usuario'],
-
-        # KPIs originales
         total_kilos=round(total_kilos, 2),
         total_piezas=total_piezas,
         procesos_activos=procesos_activos,
         dinero_total=round(dinero_total, 2),
         pedidos_pendientes=pedidos_pendientes,
-
-        # Gráficas
         nombres_prod=nombres_prod,
         cantidades_prod=cantidades_prod,
         tipos_metal=tipos_metal,
         kilos_metal=kilos_metal,
         labels_ventas=labels_ventas,
         valores_ventas=valores_ventas,
-
-        # Alertas
         alertas=alertas,
         alertas_abiertas=alertas_abiertas,
-
-        # KPIs nuevos
         choferes_activos=choferes_activos,
         unidades_disponibles=unidades_disponibles,
         envios_transito=envios_transito,
@@ -1517,11 +1309,14 @@ def inventario_metal():
 @requiere_permiso('productos.ver')
 def productos():
     if request.method == 'POST':
-        permiso_error = validar_permiso_accion('productos.crear', 'Productos', 'Crear producto', 'productos')
+        permiso_error = validar_permiso_accion(
+            'productos.crear',
+            'Productos',
+            'Crear producto',
+            'productos'
+        )
         if permiso_error:
-            return permiso_error  
-        if not validar_permiso_accion('productos.crear', 'Productos', 'Crear producto'):
-            return redirect(url_for('productos'))
+            return permiso_error
 
         nombre_producto = (request.form.get('nombre_producto') or '').strip()
         descripcion = (request.form.get('descripcion') or '').strip()
@@ -1534,19 +1329,18 @@ def productos():
         )
         db.session.add(nuevo)
         db.session.commit()
+
         registrar_auditoria(
             "Productos",
             "Crear",
             f"Producto registrado: {nuevo.nombre_producto}"
         )
 
-
         flash('Producto registrado correctamente.', 'success')
         return redirect(url_for('productos'))
 
     productos = Producto.query.order_by(Producto.id_producto.desc()).all()
     return render_template('productos.html', productos=productos)
-
 
 # ==========================================================
 # ROUTE: Editar producto
@@ -1585,7 +1379,7 @@ def utilidad_alertas():
 @requiere_permiso('mantenimiento.ver')
 def mantenimiento():
     hoy = datetime.now().date()
-    
+
     if request.method == 'POST':
         permiso_error = validar_permiso_accion(
             'mantenimiento.crear',
@@ -1595,59 +1389,76 @@ def mantenimiento():
         )
         if permiso_error:
             return permiso_error
+
         accion = request.form.get('accion')
-        
+
         if accion == 'registrar_mantenimiento':
-            # 1. Procesar la foto
             file = request.files.get('foto')
             nombre_foto_db = None
-            
+
             if file and file.filename != '':
-                # Nombre único: 20260326_143005_prensa.jpg
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 filename = secure_filename(file.filename)
                 nombre_foto_db = f"{timestamp}_{filename}"
-                # Guardar el archivo en static/evidencias
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], nombre_foto_db))
 
-            # 2. Crear el registro en la BD (foto_evidencia es String)
+                # Asegura carpeta de upload
+                upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'evidencias'))
+                os.makedirs(upload_folder, exist_ok=True)
+                app.config['UPLOAD_FOLDER'] = upload_folder
+
+                file.save(os.path.join(upload_folder, nombre_foto_db))
+
+            id_maquina = request.form.get('id_maquina', type=int)
+            tipo = request.form.get('tipo')
+            descripcion = request.form.get('descripcion')
+            fecha = datetime.strptime(request.form.get('fecha'), '%Y-%m-%d')
+            fecha_proxima_str = request.form.get('fecha_proxima')
+            fecha_proxima = datetime.strptime(fecha_proxima_str, '%Y-%m-%d') if fecha_proxima_str else None
+            costo = float(request.form.get('costo') or 0)
+            tecnico = request.form.get('tecnico')
+
             nuevo = Mantenimiento(
-                id_maquina=request.form.get('id_maquina'),
-                tipo=request.form.get('tipo'),
-                descripcion=request.form.get('descripcion'),
-                fecha=datetime.strptime(request.form.get('fecha'), '%Y-%m-%d'),
-                fecha_proxima=datetime.strptime(request.form.get('fecha_proxima'), '%Y-%m-%d') if request.form.get('fecha_proxima') else None,
-                costo=float(request.form.get('costo') or 0),
-                tecnico=request.form.get('tecnico'),
+                id_maquina=id_maquina,
+                tipo=tipo,
+                descripcion=descripcion,
+                fecha=fecha,
+                fecha_proxima=fecha_proxima,
+                costo=costo,
+                tecnico=tecnico,
                 foto_evidencia=nombre_foto_db
             )
-            
-            # Actualizar estado visual de la máquina
-            maquina = Maquina.query.get(nuevo.id_maquina)
+
+            maquina = Maquina.query.get(id_maquina)
             if maquina:
-                maquina.estado = 'Operativa' if nuevo.tipo == 'Preventivo' else 'En Reparación'
+                maquina.estado = 'Operativa' if tipo == 'Preventivo' else 'En Reparación'
 
             db.session.add(nuevo)
             db.session.commit()
+
             registrar_auditoria(
                 "Mantenimiento",
                 "Crear",
                 f"Mantenimiento registrado para máquina ID={id_maquina}"
             )
+
             flash("Registro guardado con éxito", "success")
             return redirect(url_for('mantenimiento'))
 
-    # Consultas para la vista
     maquinas = Maquina.query.all()
     historial = Mantenimiento.query.order_by(Mantenimiento.fecha.desc()).all()
-    # Gasto del mes para el cuadro verde
-    gasto_mes = db.session.query(db.func.sum(Mantenimiento.costo)).filter(db.func.extract('month', Mantenimiento.fecha) == hoy.month).scalar() or 0
-    
-    return render_template('mantenimiento.html', 
-                           maquinas=maquinas, 
-                           historial=historial, 
-                           gasto_mes=gasto_mes, 
-                           hoy=hoy)
+    gasto_mes = db.session.query(
+        db.func.sum(Mantenimiento.costo)
+    ).filter(
+        db.func.extract('month', Mantenimiento.fecha) == hoy.month
+    ).scalar() or 0
+
+    return render_template(
+        'mantenimiento.html',
+        maquinas=maquinas,
+        historial=historial,
+        gasto_mes=gasto_mes,
+        hoy=hoy
+    )
 
 @app.route('/mantenimiento/atender/<int:id_maquina>')
 def atender_orden(id_maquina):
@@ -1925,8 +1736,6 @@ def ventas():
         )
         if permiso_error:
             return permiso_error
-        if not validar_permiso_accion('ventas.crear', 'Ventas', 'Crear venta'):
-            return redirect(url_for('ventas'))
 
         id_cliente = request.form.get('id_cliente', type=int)
         id_producto = request.form.get('id_producto', type=int)
@@ -2023,7 +1832,11 @@ def compras():
         
         try:
             db.session.commit()
-            registrar_log("Compra", "Compras", f"Compra de {producto} ({cantidad} unidades) por un total de ${total:,.2f}")
+            registrar_auditoria(
+            "Compras",
+            "Compra",
+            f"Compra de {producto} ({cantidad} unidades) por un total de ${total:,.2f}"
+            )
         except Exception as e:
             db.session.rollback()
             return f"Error al registrar la compra: {e}"
@@ -3326,36 +3139,75 @@ def editar_usuario(id):
 @app.route('/privilegios', methods=['GET', 'POST'])
 @admin_required
 def privilegios():
-    # 1. Seguridad básica: Solo administradores pueden entrar aquí
-    if 'usuario' not in session or session.get('rol') != 'Administrador':
-        flash("Acceso denegado. Solo administradores pueden gestionar privilegios.", "error")
-        return redirect(url_for('compras')) # O la ruta que uses como inicio
+    roles_disponibles = [
+        'Administrador',
+        'Supervisor',
+        'Operador',
+        'Compras',
+        'Ventas',
+        'Logistica',
+        'Produccion',
+        'Mantenimiento',
+        'Calidad'
+    ]
 
-    # 2. Si se envía el formulario para cambiar un rol
     if request.method == 'POST':
-        usuario_modificado = request.form.get('nombre_usuario')
-        nuevo_rol = request.form.get('rol')
-        
-        # Buscamos si ya tiene un registro en la tabla RolUsuario
-        rol_existente = RolUsuario.query.filter_by(nombre_usuario=usuario_modificado).first()
-        
-        if rol_existente:
-            rol_existente.rol = nuevo_rol
-        else:
-            # Si por alguna razón no estaba en la tabla de roles, lo creamos
-            nuevo_registro = RolUsuario(nombre_usuario=usuario_modificado, rol=nuevo_rol)
-            db.session.add(nuevo_registro)
-            
-        db.session.commit()
+        usuario_modificado = (request.form.get('nombre_usuario') or '').strip()
+        nuevo_rol = (request.form.get('rol') or '').strip()
 
-        registrar_log("Actualización", "Privilegios", f"Se cambió el rol de {usuario_modificado} a {nuevo_rol}")
-        flash(f"Privilegios actualizados: {usuario_modificado} ahora es {nuevo_rol}.", "success")
+        if not usuario_modificado:
+            flash("No se recibió el usuario a actualizar.", "error")
+            return redirect(url_for('privilegios'))
+
+        if nuevo_rol not in roles_disponibles:
+            flash("El rol seleccionado no es válido.", "error")
+            return redirect(url_for('privilegios'))
+
+        usuario_db = InicioLog.query.filter_by(usuario=usuario_modificado).first()
+        if not usuario_db:
+            flash("El usuario no existe en InicioLog.", "error")
+            return redirect(url_for('privilegios'))
+
+        rol_existente = RolUsuario.query.filter_by(nombre_usuario=usuario_modificado).first()
+
+        try:
+            if rol_existente:
+                rol_anterior = rol_existente.rol
+                rol_existente.rol = nuevo_rol
+                detalle = f"Usuario={usuario_modificado} | Rol anterior={rol_anterior} | Rol nuevo={nuevo_rol}"
+            else:
+                nuevo_registro = RolUsuario(
+                    nombre_usuario=usuario_modificado,
+                    rol=nuevo_rol
+                )
+                db.session.add(nuevo_registro)
+                detalle = f"Usuario={usuario_modificado} | Rol asignado={nuevo_rol}"
+
+            db.session.commit()
+
+            registrar_auditoria(
+                "Privilegios",
+                "Actualizar rol",
+                detalle
+            )
+
+            flash(f"Privilegios actualizados: {usuario_modificado} ahora es {nuevo_rol}.", "success")
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f"No se pudo actualizar el rol: {str(e)}", "error")
+
         return redirect(url_for('privilegios'))
 
-    # 3. GET: Traer todos los usuarios para mostrarlos en la tabla
-    usuarios_db = InicioLog.query.all()
+    usuarios_db = InicioLog.query.order_by(InicioLog.usuario.asc()).all()
     roles_asignados = {r.nombre_usuario: r.rol for r in RolUsuario.query.all()}
-    return render_template('privilegios.html', usuarios=usuarios_db, roles_asignados=roles_asignados)
+
+    return render_template(
+        'privilegios.html',
+        usuarios=usuarios_db,
+        roles_asignados=roles_asignados,
+        roles_disponibles=roles_disponibles
+    )
 
 @app.route('/actualizar_bd')
 def actualizar_bd():
@@ -3371,11 +3223,15 @@ def actualizar_bd():
 @admin_required
 def eliminar_producto(id):
     prod = Producto.query.get(id)
-    registrar_log("Eliminar", "Inventario", f"Elimino el producto: {prod.nombre_producto}")
-
+    registrar_auditoria(
+    "Inventario",
+    "Eliminar",
+    f"Eliminó el producto: {prod.nombre_producto}"
+    )
     db.session.delete(prod)
     db.session.commit()
     return redirect(url_for('productos'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
