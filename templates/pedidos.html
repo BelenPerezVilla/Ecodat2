@@ -2,6 +2,20 @@
 
 {% block title %}Pedidos de Venta - EcoData{% endblock %}
 
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del módulo de pedidos.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/pedidos">Comercial</a>
+    <span class="sep">/</span>
+    <span>Pedidos de venta</span>
+</div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
     /*
@@ -64,6 +78,17 @@
 {% endblock %}
 
 {% block content %}
+<!--
+    Propósito:
+    Calcular métricas rápidas del módulo de pedidos.
+-->
+{% set pendientes = pedidos | selectattr('estado', 'equalto', 'Pendiente') | list %}
+{% set despachados = pedidos | selectattr('estado', 'equalto', 'Despachado') | list %}
+{% set total_pedidos = namespace(valor=0) %}
+{% for p in pedidos %}
+    {% set total_pedidos.valor = total_pedidos.valor + (p.total or 0) %}
+{% endfor %}
+
 <div class="page-header">
     <div>
         <h1 class="page-title">Pedidos de venta</h1>
@@ -72,19 +97,22 @@
         </p>
     </div>
 
-    <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary">
-        <i class="fas fa-plus"></i>
-        Nuevo pedido
-    </a>
+    <div class="page-actions">
+        <!--
+            Propósito:
+            Botón principal para crear un nuevo pedido.
+        -->
+        <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            Nuevo pedido
+        </a>
+    </div>
 </div>
 
-{% set pendientes = pedidos | selectattr('estado', 'equalto', 'Pendiente') | list %}
-{% set despachados = pedidos | selectattr('estado', 'equalto', 'Despachado') | list %}
-{% set total_ventas = namespace(valor=0) %}
-{% for p in pedidos %}
-    {% set total_ventas.valor = total_ventas.valor + (p.total or 0) %}
-{% endfor %}
-
+<!--
+    Propósito:
+    KPIs principales del módulo.
+-->
 <div class="grid grid-4" style="margin-bottom: 20px;">
     <div class="kpi">
         <div class="kpi-label">Pedidos totales</div>
@@ -103,10 +131,14 @@
 
     <div class="kpi">
         <div class="kpi-label">Monto acumulado</div>
-        <div class="kpi-value">${{ "{:,.2f}".format(total_ventas.valor) }}</div>
+        <div class="kpi-value">${{ "{:,.2f}".format(total_pedidos.valor) }}</div>
     </div>
 </div>
 
+<!--
+    Propósito:
+    Resumen comercial del módulo.
+-->
 <div class="grid grid-2" style="margin-bottom: 22px;">
     <div class="card">
         <div class="card-header">
@@ -136,7 +168,7 @@
                         <strong>Total acumulado</strong>
                         <span>Valor total del listado actual</span>
                     </div>
-                    <span class="badge badge-info">${{ "{:,.2f}".format(total_ventas.valor) }}</span>
+                    <span class="badge badge-info">${{ "{:,.2f}".format(total_pedidos.valor) }}</span>
                 </div>
             </div>
         </div>
@@ -162,6 +194,10 @@
     </div>
 </div>
 
+<!--
+    Propósito:
+    Tabla principal del listado de pedidos.
+-->
 <div class="card">
     <div class="card-header">
         <h3><i class="fas fa-box"></i> Listado de pedidos</h3>
@@ -169,8 +205,39 @@
     </div>
 
     <div class="card-body" style="padding: 0;">
+        <!--
+            Propósito:
+            Barra de filtros para el listado de pedidos.
+        -->
+        <div class="table-tools">
+            <div class="table-filters">
+                <div class="filtro-input-wrap">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <input
+                        id="filtroPedidosTexto"
+                        type="text"
+                        class="input"
+                        placeholder="Buscar por folio, cliente, empresa o estado"
+                    />
+                </div>
+
+                <select id="filtroPedidosEstado" class="select">
+                    <option value="todos">Todos los estados</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="despachado">Despachado</option>
+                </select>
+
+                <button type="button" class="btn btn-outline" id="limpiarPedidosFiltros">
+                    <i class="fas fa-rotate-left"></i>
+                    Limpiar
+                </button>
+            </div>
+
+            <div class="toolbar-counter" id="contadorPedidos">{{ pedidos|length }} resultados</div>
+        </div>
+
         <div class="table-shell">
-            <table class="table">
+            <table class="table" id="tablaPedidos">
                 <thead>
                     <tr>
                         <th>Folio</th>
@@ -183,7 +250,11 @@
                 </thead>
                 <tbody>
                     {% for pedido in pedidos %}
-                        <tr>
+                        <tr
+                            class="js-filter-row"
+                            data-search="{{ ('#' ~ pedido.id_pedido ~ ' ' ~ (pedido.cliente.nombre_contacto if pedido.cliente else '') ~ ' ' ~ (pedido.cliente.empresa if pedido.cliente else '') ~ ' ' ~ (pedido.estado or ''))|lower }}"
+                            data-estado="{{ (pedido.estado or '')|lower }}"
+                        >
                             <td>
                                 <div class="pedido-folio">#{{ "%04d"|format(pedido.id_pedido) }}</div>
                                 <div class="pedido-meta">Pedido de venta</div>
@@ -221,6 +292,10 @@
                             </td>
 
                             <td>
+                                <!--
+                                    Propósito:
+                                    Abrir el detalle del pedido seleccionado.
+                                -->
                                 <a
                                     href="{{ url_for('detalle_pedido', id=pedido.id_pedido) }}"
                                     class="btn btn-secondary btn-sm"
@@ -243,6 +318,38 @@
                 </tbody>
             </table>
         </div>
+
+        <!--
+            Propósito:
+            Mostrar estado vacío cuando los filtros no encuentren resultados.
+        -->
+        <div id="emptyPedidosDynamic" class="results-empty-inline">
+            <div class="empty-state">
+                <i class="fas fa-filter-circle-xmark"></i>
+                No hay pedidos que coincidan con los filtros aplicados.
+            </div>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    /*
+        Propósito:
+        Inicializar filtros del listado de pedidos.
+    */
+    document.addEventListener("DOMContentLoaded", function () {
+        initSmartTableFilters({
+            tableId: "tablaPedidos",
+            textInputId: "filtroPedidosTexto",
+            counterId: "contadorPedidos",
+            emptyStateId: "emptyPedidosDynamic",
+            clearButtonId: "limpiarPedidosFiltros",
+            filters: [
+                { id: "filtroPedidosEstado", datasetKey: "estado", kind: "exact" }
+            ]
+        });
+    });
+</script>
 {% endblock %}

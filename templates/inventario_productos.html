@@ -1,69 +1,281 @@
 {% extends "base.html" %}
 
-{% block title %}Inventario Productos Terminados - Ecodata{% endblock %}
+{% block title %}Inventario de Productos Terminados - EcoData{% endblock %}
+
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del inventario terminado.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/inventario_productos">Inventario</a>
+    <span class="sep">/</span>
+    <span>Stock terminado</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del inventario de producto terminado.
+    */
+    .stock-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 0.8rem;
+        font-weight: 800;
+        border: 1px solid #bfdbfe;
+    }
+
+    .stock-total {
+        font-weight: 800;
+        color: var(--success);
+    }
+
+    .inv-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .inv-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .inv-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .inv-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .inv-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    input, select { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
-    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
-    .btn-add { background-color: #007bff; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-    th { background-color: #343a40; color: white; }
-    tr:nth-child(even) { background-color: #f2f2f2; }
-</style>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Inventario de productos terminados</h1>
+        <p class="page-subtitle">
+            Registra entradas de stock terminado por producto, almacén y fecha de fabricación.
+        </p>
+    </div>
 
-<div class="card">
-    <h4>Ingresar Stock de Producto Terminado</h4>
-    <form action="/inventario_productos" method="POST">
-        <select name="id_producto" required>
-            <option value="">-- Seleccionar Producto --</option>
-            {% for prod in productos %}
-                <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
-            {% endfor %}
-        </select>
-        
-        <select name="id_almacen" required>
-            <option value="">-- Seleccionar Almacén --</option>
-            {% for alm in almacenes %}
-                <option value="{{ alm.id_almacen }}">{{ alm.nombre_almacen }}</option>
-            {% endfor %}
-        </select>
-        
-        <input type="number" name="cantidad_stock" placeholder="Cantidad de Piezas" required>
-        
-        <input type="date" name="fecha_fabricacion" required title="Fecha de Fabricación">
-        
-        <button type="submit" class="btn btn-add">Actualizar Stock</button>
-    </form>
+    <a href="{{ url_for('productos') }}" class="btn btn-secondary">
+        <i class="fas fa-tags"></i>
+        Ver catálogo
+    </a>
+</div>
+
+{% set total_piezas = namespace(valor=0) %}
+{% for inv in inventario %}
+    {% set total_piezas.valor = total_piezas.valor + (inv.cantidad_stock or 0) %}
+{% endfor %}
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Lotes registrados</div>
+        <div class="kpi-value">{{ inventario|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Piezas totales</div>
+        <div class="kpi-value">{{ total_piezas.valor }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Productos</div>
+        <div class="kpi-value">{{ productos|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Almacenes</div>
+        <div class="kpi-value">{{ almacenes|length }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-boxes-stacked"></i> Estado del stock</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="inv-summary">
+                <div class="inv-summary-item">
+                    <div>
+                        <strong>Lotes terminados</strong>
+                        <span>Registros activos en inventario</span>
+                    </div>
+                    <span class="badge badge-info">{{ inventario|length }}</span>
+                </div>
+
+                <div class="inv-summary-item">
+                    <div>
+                        <strong>Piezas disponibles</strong>
+                        <span>Total general en stock</span>
+                    </div>
+                    <span class="badge badge-success">{{ total_piezas.valor }}</span>
+                </div>
+
+                <div class="inv-summary-item">
+                    <div>
+                        <strong>Base productiva</strong>
+                        <span>Productos y almacenes enlazados</span>
+                    </div>
+                    <span class="badge badge-neutral">Operando</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="inv-empty-note">
+                Usa este módulo para alimentar ventas, pedidos y despacho con cantidades reales
+                de producto terminado por almacén.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-plus-circle"></i> Ingresar stock de producto terminado</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="{{ url_for('inventario_productos') }}" method="POST">
+            <div class="form-grid cols-4">
+                <div class="field">
+                    <label for="id_producto">Producto</label>
+                    <select id="id_producto" name="id_producto" class="select" required>
+                        <option value="" disabled selected>Seleccionar producto...</option>
+                        {% for prod in productos %}
+                            <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="id_almacen">Almacén</label>
+                    <select id="id_almacen" name="id_almacen" class="select" required>
+                        <option value="" disabled selected>Seleccionar almacén...</option>
+                        {% for alm in almacenes %}
+                            <option value="{{ alm.id_almacen }}">{{ alm.nombre_almacen }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="cantidad_stock">Cantidad de piezas</label>
+                    <input id="cantidad_stock" type="number" name="cantidad_stock" class="input" min="1" required />
+                </div>
+
+                <div class="field">
+                    <label for="fecha_fabricacion">Fecha de fabricación</label>
+                    <input id="fecha_fabricacion" type="date" name="fecha_fabricacion" class="input" required />
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-box"></i>
+                    Actualizar stock
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div class="card">
-    <h4>Stock Actual</h4>
-    <table>
-        <thead>
-            <tr>
-                <th>Lote ID</th>
-                <th>Producto</th>
-                <th>Almacén</th>
-                <th>Piezas Disponibles</th>
-                <th>Fecha Fabricación</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for inv in inventario %}
-            <tr>
-                <td>{{ inv.id_inventario_p }}</td>
-                <td><strong>{{ inv.producto.nombre_producto if inv.producto else 'ID: ' ~ inv.id_producto }}</strong></td>
-                <td>{{ inv.almacen.nombre_almacen if inv.almacen else 'ID: ' ~ inv.id_almacen }}</td>
-                <td style="color: #007bff; font-weight: bold;">{{ inv.cantidad_stock }} pzas</td>
-                <td>{{ inv.fecha_fabricacion }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="text-align: center;">No hay productos terminados en stock.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="card-header">
+        <h3><i class="fas fa-warehouse"></i> Stock actual</h3>
+        <span class="badge badge-neutral">{{ inventario|length }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding:0;">
+        <div class="table-shell">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Lote ID</th>
+                        <th>Producto</th>
+                        <th>Almacén</th>
+                        <th>Piezas disponibles</th>
+                        <th>Fecha fabricación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in inventario %}
+                        <tr>
+                            <td><strong>#{{ inv.id_inventario_p }}</strong></td>
+
+                            <td>
+                                <strong>{{ inv.producto.nombre_producto if inv.producto else 'ID: ' ~ inv.id_producto }}</strong>
+                            </td>
+
+                            <td>{{ inv.almacen.nombre_almacen if inv.almacen else 'ID: ' ~ inv.id_almacen }}</td>
+
+                            <td>
+                                <span class="stock-chip">
+                                    <i class="fas fa-cubes"></i>
+                                    {{ inv.cantidad_stock }} pzas
+                                </span>
+                            </td>
+
+                            <td>
+                                {% if inv.fecha_fabricacion %}
+                                    {{ inv.fecha_fabricacion.strftime('%d/%m/%Y') if inv.fecha_fabricacion.strftime else inv.fecha_fabricacion }}
+                                {% else %}
+                                    N/D
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <i class="fas fa-box-open"></i>
+                                    No hay productos terminados en stock todavía.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}

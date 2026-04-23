@@ -1,86 +1,415 @@
 {% extends "base.html" %}
 
-{% block title %}Ventas y Reportes - Ecodata{% endblock %}
+{% block title %}Ventas y Reportes - EcoData{% endblock %}
+
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del módulo de ventas.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/ventas">Comercial</a>
+    <span class="sep">/</span>
+    <span>Ventas</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del módulo de ventas.
+    */
+    .venta-folio {
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .venta-meta {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-top: 4px;
+    }
+
+    .venta-total {
+        color: var(--success);
+        font-weight: 800;
+    }
+
+    .venta-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .venta-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .venta-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .venta-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .venta-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    input, select { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
-    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; text-decoration: none; display: inline-block; }
-    .btn-add { background-color: #17a2b8; }
-    .btn-pdf { background-color: #6c757d; font-size: 12px; padding: 5px 10px; }
-    .btn-pdf:hover { background-color: #495057; }
-    
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-    th { background-color: #343a40; color: white; }
-    tr:nth-child(even) { background-color: #f9f9f9; }
-    .monto-positivo { color: #28a745; font-weight: bold; }
-</style>
+<!--
+    Propósito:
+    Calcular métricas generales del módulo de ventas.
+-->
+{% set total_ventas_monto = namespace(valor=0) %}
+{% for venta in ventas %}
+    {% set total_ventas_monto.valor = total_ventas_monto.valor + (venta.total_venta or 0) %}
+{% endfor %}
+{% set ticket_promedio = (total_ventas_monto.valor / (ventas|length)) if ventas|length > 0 else 0 %}
 
-<div class="card">
-    <h4>Registrar Nueva Venta</h4>
-    <form action="/ventas" method="POST">
-        <select name="id_cliente" required style="width: 250px;">
-            <option value="">-- Seleccionar Cliente --</option>
-            {% for cli in clientes %}
-                <option value="{{ cli.id_cliente }}">{{ cli.empresa }} ({{ cli.nombre_contacto }})</option>
-            {% endfor %}
-        </select>
-        
-        <select name="id_producto" required style="width: 250px;">
-            <option value="">-- Seleccionar Producto --</option>
-            {% for prod in productos %}
-                <option value="{{ prod.id_producto }}">{{ prod.nombre_producto }}</option>
-            {% endfor %}
-        </select>
-        
-        <input type="number" name="cantidad" placeholder="Cant." required style="width: 80px;">
-        <input type="number" step="0.01" name="total_venta" placeholder="Total $" required style="width: 120px;">
-        <input type="date" name="fecha_venta" required>
-        
-        <button type="submit" class="btn btn-add">Registrar Venta</button>
-    </form>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Ventas y reportes</h1>
+        <p class="page-subtitle">
+            Registra ventas cerradas y descarga la nota en PDF para cada operación comercial.
+        </p>
+    </div>
+
+    <div class="page-actions">
+        <!--
+            Propósito:
+            Ir al directorio de clientes para revisar la cartera comercial.
+        -->
+        <a href="{{ url_for('clientes') }}" class="btn btn-secondary">
+            <i class="fas fa-users"></i>
+            Ver clientes
+        </a>
+    </div>
 </div>
 
-<div class="card">
-    <h4>Historial de Ventas Cerradas</h4>
-    <table>
-        <thead>
-            <tr>
-                <th>Folio</th>
-                <th>Cliente / Empresa</th>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Total Cobrado</th>
-                <th>Fecha</th>
-                <th>Reporte</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for venta in ventas %}
-            <tr>
-                <td><strong>#00{{ venta.id_venta }}</strong></td>
-                <td>{{ venta.cliente.empresa if venta.cliente else 'N/A' }}</td>
-                <td>{{ venta.producto.nombre_producto if venta.producto else 'N/A' }}</td>
-                <td>{{ venta.cantidad }} pzas</td>
-                <td class="monto-positivo">${{ "{:,.2f}".format(venta.total_venta) }}</td>
-                <td>{{ venta.fecha_venta }}</td>
-                <td>
-                    <a href="/descargar_nota/{{ venta.id_venta }}" class="btn btn-pdf">
-                        📄 Descargar PDF
-                    </a>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="7" style="text-align: center; color: #666;">No hay registros de ventas disponibles.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!--
+    Propósito:
+    KPIs principales del módulo.
+-->
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Ventas registradas</div>
+        <div class="kpi-value">{{ ventas|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Ingresos acumulados</div>
+        <div class="kpi-value">${{ "{:,.2f}".format(total_ventas_monto.valor) }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Ticket promedio</div>
+        <div class="kpi-value">${{ "{:,.2f}".format(ticket_promedio) }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Productos activos</div>
+        <div class="kpi-value">{{ productos|length }}</div>
+    </div>
 </div>
 
+<!--
+    Propósito:
+    Resumen ejecutivo y recomendaciones rápidas.
+-->
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-chart-line"></i> Resumen comercial</h3>
+        </div>
 
+        <div class="card-body">
+            <div class="venta-summary">
+                <div class="venta-summary-item">
+                    <div>
+                        <strong>Ventas registradas</strong>
+                        <span>Operaciones cerradas en el sistema</span>
+                    </div>
+                    <span class="badge badge-info">{{ ventas|length }}</span>
+                </div>
 
+                <div class="venta-summary-item">
+                    <div>
+                        <strong>Ingresos acumulados</strong>
+                        <span>Monto total cobrado</span>
+                    </div>
+                    <span class="badge badge-success">${{ "{:,.2f}".format(total_ventas_monto.valor) }}</span>
+                </div>
+
+                <div class="venta-summary-item">
+                    <div>
+                        <strong>Ticket promedio</strong>
+                        <span>Valor medio por operación</span>
+                    </div>
+                    <span class="badge badge-neutral">${{ "{:,.2f}".format(ticket_promedio) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="venta-empty-note">
+                Usa este módulo para registrar ventas cerradas. El PDF de nota de venta puede descargarse
+                directamente desde el historial.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Formulario principal para registrar nuevas ventas.
+-->
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-cash-register"></i> Registrar nueva venta</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="{{ url_for('ventas') }}" method="POST" id="formVentas">
+            <div class="form-grid cols-5" style="grid-template-columns: 2fr 2fr 1fr 1fr 1fr;">
+                <div class="field">
+                    <label for="id_cliente">Cliente</label>
+                    <select name="id_cliente" id="id_cliente" class="select" required>
+                        <option value="">-- Seleccionar Cliente --</option>
+                        {% for cli in clientes %}
+                            <option value="{{ cli.id_cliente }}">{{ cli.empresa }} ({{ cli.nombre_contacto }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="id_producto">Producto</label>
+                    <select name="id_producto" id="id_producto" class="select" required>
+                        <option value="">-- Seleccionar Producto --</option>
+                        {% for prod in productos %}
+                            <option value="{{ prod.id_producto }}" data-precio="{{ prod.precio or 0 }}">
+                                {{ prod.nombre_producto }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="cantidad">Cantidad</label>
+                    <input type="number" name="cantidad" id="cantidad" class="input" min="1" required />
+                </div>
+
+                <div class="field">
+                    <label for="total_venta">Total $</label>
+                    <input type="number" step="0.01" name="total_venta" id="total_venta" class="input" required />
+                </div>
+
+                <div class="field">
+                    <label for="fecha_venta">Fecha</label>
+                    <input type="date" name="fecha_venta" id="fecha_venta" class="input" required />
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+                <button type="submit" class="btn btn-primary" data-loading-text="Registrando...">
+                    <i class="fas fa-floppy-disk"></i>
+                    Registrar venta
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Historial principal de ventas con filtros.
+-->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-clock-rotate-left"></i> Historial de ventas cerradas</h3>
+        <span class="badge badge-neutral">{{ ventas|length }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding:0;">
+        <!--
+            Propósito:
+            Barra de filtros para ventas.
+        -->
+        <div class="table-tools">
+            <div class="table-filters">
+                <div class="filtro-input-wrap">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <input
+                        id="filtroVentasTexto"
+                        type="text"
+                        class="input"
+                        placeholder="Buscar por folio, cliente, empresa o producto"
+                    />
+                </div>
+
+                <button type="button" class="btn btn-outline" id="limpiarVentasFiltros">
+                    <i class="fas fa-rotate-left"></i>
+                    Limpiar
+                </button>
+            </div>
+
+            <div class="toolbar-counter" id="contadorVentas">{{ ventas|length }} resultados</div>
+        </div>
+
+        <div class="table-shell">
+            <table class="table" id="tablaVentas">
+                <thead>
+                    <tr>
+                        <th>Folio</th>
+                        <th>Cliente / empresa</th>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Total cobrado</th>
+                        <th>Fecha</th>
+                        <th>Reporte</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for venta in ventas %}
+                        <tr
+                            class="js-filter-row"
+                            data-search="{{ ('#' ~ venta.id_venta ~ ' ' ~ (venta.cliente.empresa if venta.cliente else '') ~ ' ' ~ (venta.cliente.nombre_contacto if venta.cliente else '') ~ ' ' ~ (venta.producto.nombre_producto if venta.producto else ''))|lower }}"
+                        >
+                            <td>
+                                <div class="venta-folio">#00{{ venta.id_venta }}</div>
+                            </td>
+
+                            <td>
+                                {% if venta.cliente %}
+                                    <strong>{{ venta.cliente.empresa }}</strong><br>
+                                    <span class="venta-meta">{{ venta.cliente.nombre_contacto }}</span>
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+
+                            <td>{{ venta.producto.nombre_producto if venta.producto else 'N/A' }}</td>
+
+                            <td>{{ venta.cantidad }} pzas</td>
+
+                            <td>
+                                <span class="venta-total">${{ "{:,.2f}".format(venta.total_venta or 0) }}</span>
+                            </td>
+
+                            <td>
+                                {% if venta.fecha_venta %}
+                                    {{ venta.fecha_venta.strftime('%d/%m/%Y') if venta.fecha_venta.strftime else venta.fecha_venta }}
+                                {% else %}
+                                    N/D
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <!--
+                                    Propósito:
+                                    Descargar la nota PDF de la venta.
+                                -->
+                                <a href="{{ url_for('descargar_nota', id_venta=venta.id_venta) }}" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-file-pdf"></i>
+                                    Descargar PDF
+                                </a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="fas fa-file-invoice-dollar"></i>
+                                    No hay registros de ventas disponibles.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!--
+            Propósito:
+            Estado vacío cuando los filtros no encuentren coincidencias.
+        -->
+        <div id="emptyVentasDynamic" class="results-empty-inline">
+            <div class="empty-state">
+                <i class="fas fa-filter-circle-xmark"></i>
+                No hay ventas que coincidan con la búsqueda.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    /*
+        Propósito:
+        Calcular automáticamente el total sugerido en la venta con base
+        al precio del producto y la cantidad capturada.
+    */
+    const productoSelect = document.getElementById("id_producto");
+    const cantidadInput = document.getElementById("cantidad");
+    const totalVentaInput = document.getElementById("total_venta");
+
+    function actualizarTotalVenta() {
+        if (!productoSelect || !cantidadInput || !totalVentaInput) return;
+
+        const option = productoSelect.options[productoSelect.selectedIndex];
+        const precio = parseFloat(option?.dataset?.precio || "0");
+        const cantidad = parseFloat(cantidadInput.value || "0");
+
+        if (precio > 0 && cantidad > 0) {
+            totalVentaInput.value = (precio * cantidad).toFixed(2);
+        }
+    }
+
+    if (productoSelect && cantidadInput) {
+        productoSelect.addEventListener("change", actualizarTotalVenta);
+        cantidadInput.addEventListener("input", actualizarTotalVenta);
+    }
+
+    /*
+        Propósito:
+        Inicializar filtros del listado de ventas.
+    */
+    document.addEventListener("DOMContentLoaded", function () {
+        initSmartTableFilters({
+            tableId: "tablaVentas",
+            textInputId: "filtroVentasTexto",
+            counterId: "contadorVentas",
+            emptyStateId: "emptyVentasDynamic",
+            clearButtonId: "limpiarVentasFiltros"
+        });
+    });
+</script>
 {% endblock %}

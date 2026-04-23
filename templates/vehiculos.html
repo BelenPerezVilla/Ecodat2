@@ -2,6 +2,21 @@
 
 {% block title %}Gestión de Flota - EcoData{% endblock %}
 
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del módulo de flota.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/vehiculos">Logística</a>
+    <span class="sep">/</span>
+    <span>Gestión de flota</span>
+</div>
+{% endblock %}
+
+
 {% block extra_head %}
 <style>
     /*

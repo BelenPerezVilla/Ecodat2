@@ -2,6 +2,20 @@
 
 {% block title %}Directorio de Choferes - EcoData{% endblock %}
 
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del directorio de choferes.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/choferes">Logística</a>
+    <span class="sep">/</span>
+    <span>Directorio de choferes</span>
+</div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
     /*

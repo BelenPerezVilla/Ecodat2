@@ -2,6 +2,20 @@
 
 {% block title %}Control de Báscula y Embarques - EcoData{% endblock %}
 
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del módulo de embarques.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/embarques">Logística</a>
+    <span class="sep">/</span>
+    <span>Control de báscula</span>
+</div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
     /*
@@ -85,6 +99,13 @@
 {% endblock %}
 
 {% block content %}
+<!--
+    Propósito:
+    Separar movimientos por tipo para métricas rápidas.
+-->
+{% set entradas = embarques | selectattr('tipo_movimiento', 'equalto', 'Entrada') | list %}
+{% set salidas = embarques | selectattr('tipo_movimiento', 'equalto', 'Salida') | list %}
+
 <div class="page-header">
     <div>
         <h1 class="page-title">Control de báscula y embarques</h1>
@@ -93,15 +114,22 @@
         </p>
     </div>
 
-    <a href="{{ url_for('transporte') }}" class="btn btn-secondary">
-        <i class="fas fa-truck-fast"></i>
-        Ir a transporte
-    </a>
+    <div class="page-actions">
+        <!--
+            Propósito:
+            Acceso directo al módulo de transporte.
+        -->
+        <a href="{{ url_for('transporte') }}" class="btn btn-secondary">
+            <i class="fas fa-truck-fast"></i>
+            Ir a transporte
+        </a>
+    </div>
 </div>
 
-{% set entradas = embarques | selectattr('tipo_movimiento', 'equalto', 'Entrada') | list %}
-{% set salidas = embarques | selectattr('tipo_movimiento', 'equalto', 'Salida') | list %}
-
+<!--
+    Propósito:
+    KPIs principales del módulo.
+-->
 <div class="grid grid-4" style="margin-bottom: 20px;">
     <div class="kpi">
         <div class="kpi-label">Movimientos</div>
@@ -124,6 +152,10 @@
     </div>
 </div>
 
+<!--
+    Propósito:
+    Resumen operativo y recomendaciones del módulo.
+-->
 <div class="grid grid-2" style="margin-bottom: 22px;">
     <div class="card">
         <div class="card-header">
@@ -175,6 +207,10 @@
     </div>
 </div>
 
+<!--
+    Propósito:
+    Formulario principal para registrar un movimiento de báscula.
+-->
 <div class="card" style="margin-bottom: 22px;">
     <div class="card-header">
         <h3><i class="fas fa-weight-hanging"></i> Registro de báscula</h3>
@@ -232,7 +268,9 @@
 
                         <optgroup label="Clientes">
                             {% for c in clientes %}
-                                <option value="{{ c.empresa }}">{{ c.empresa }}{% if c.nombre_contacto %} ({{ c.nombre_contacto }}){% endif %}</option>
+                                <option value="{{ c.empresa }}">
+                                    {{ c.empresa }}{% if c.nombre_contacto %} ({{ c.nombre_contacto }}){% endif %}
+                                </option>
                             {% endfor %}
                         </optgroup>
                     </select>
@@ -291,7 +329,7 @@
             </div>
 
             <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" data-loading-text="Registrando...">
                     <i class="fas fa-weight-hanging"></i>
                     Registrar pesaje
                 </button>
@@ -300,6 +338,10 @@
     </div>
 </div>
 
+<!--
+    Propósito:
+    Historial principal de movimientos de báscula.
+-->
 <div class="card">
     <div class="card-header">
         <h3><i class="fas fa-clock-rotate-left"></i> Historial de movimientos</h3>
@@ -307,8 +349,39 @@
     </div>
 
     <div class="card-body" style="padding: 0;">
+        <!--
+            Propósito:
+            Barra de filtros para movimientos de báscula.
+        -->
+        <div class="table-tools">
+            <div class="table-filters">
+                <div class="filtro-input-wrap">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <input
+                        id="filtroEmbarquesTexto"
+                        type="text"
+                        class="input"
+                        placeholder="Buscar por folio, placas, chofer, material o destino"
+                    />
+                </div>
+
+                <select id="filtroEmbarquesTipo" class="select">
+                    <option value="todos">Todos los movimientos</option>
+                    <option value="entrada">Entrada</option>
+                    <option value="salida">Salida</option>
+                </select>
+
+                <button type="button" class="btn btn-outline" id="limpiarEmbarquesFiltros">
+                    <i class="fas fa-rotate-left"></i>
+                    Limpiar
+                </button>
+            </div>
+
+            <div class="toolbar-counter" id="contadorEmbarques">{{ embarques|length }} resultados</div>
+        </div>
+
         <div class="table-shell">
-            <table class="table">
+            <table class="table" id="tablaEmbarques">
                 <thead>
                     <tr>
                         <th>Folio</th>
@@ -323,7 +396,11 @@
                 </thead>
                 <tbody>
                     {% for e in embarques %}
-                        <tr>
+                        <tr
+                            class="js-filter-row"
+                            data-search="{{ ('#EMB-' ~ e.id_embarque ~ ' ' ~ (e.placas or '') ~ ' ' ~ (e.chofer or '') ~ ' ' ~ (e.origen_destino or '') ~ ' ' ~ (e.tipo_metal or ''))|lower }}"
+                            data-tipo="{{ (e.tipo_movimiento or '')|lower }}"
+                        >
                             <td>
                                 <div class="embarque-folio">#EMB-{{ e.id_embarque }}</div>
                             </td>
@@ -379,6 +456,17 @@
                 </tbody>
             </table>
         </div>
+
+        <!--
+            Propósito:
+            Mostrar estado vacío cuando los filtros no encuentren coincidencias.
+        -->
+        <div id="emptyEmbarquesDynamic" class="results-empty-inline">
+            <div class="empty-state">
+                <i class="fas fa-filter-circle-xmark"></i>
+                No hay movimientos que coincidan con los filtros.
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -410,5 +498,22 @@
         pesoBrutoInput.addEventListener("input", actualizarPesoNeto);
         pesoTaraInput.addEventListener("input", actualizarPesoNeto);
     }
+
+    /*
+        Propósito:
+        Inicializar filtros del módulo de embarques.
+    */
+    document.addEventListener("DOMContentLoaded", function () {
+        initSmartTableFilters({
+            tableId: "tablaEmbarques",
+            textInputId: "filtroEmbarquesTexto",
+            counterId: "contadorEmbarques",
+            emptyStateId: "emptyEmbarquesDynamic",
+            clearButtonId: "limpiarEmbarquesFiltros",
+            filters: [
+                { id: "filtroEmbarquesTipo", datasetKey: "tipo", kind: "exact" }
+            ]
+        });
+    });
 </script>
 {% endblock %}

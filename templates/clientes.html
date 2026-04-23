@@ -1,50 +1,271 @@
 {% extends "base.html" %}
 
-{% block title %}Directorio de Clientes - Ecodata{% endblock %}
+{% block title %}Directorio de Clientes - EcoData{% endblock %}
+
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del directorio de clientes.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/clientes">Comercial</a>
+    <span class="sep">/</span>
+    <span>Clientes</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del módulo de clientes.
+    */
+    .client-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 18px;
+    }
+
+    .client-card {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+    }
+
+    .client-card-top {
+        padding: 22px 18px 18px;
+        border-bottom: 1px solid var(--border);
+        background: #fbfdff;
+    }
+
+    .client-company {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .client-contact {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+    }
+
+    .client-body {
+        padding: 16px 18px 18px;
+    }
+
+    .client-row {
+        margin-bottom: 10px;
+        font-size: 0.92rem;
+        color: #334155;
+    }
+
+    .client-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .client-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .client-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .client-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .client-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-    .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    input { padding: 10px; margin-right: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
-    .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
-    .btn-add { background-color: #17a2b8; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-    th { background-color: #343a40; color: white; }
-    tr:nth-child(even) { background-color: #f2f2f2; }
-</style>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Directorio de clientes</h1>
+        <p class="page-subtitle">
+            Administra la cartera comercial del sistema y registra contactos principales por empresa.
+        </p>
+    </div>
 
-<div class="card">
-    <h4>Registrar Nuevo Cliente</h4>
-    <form action="/clientes" method="POST">
-        <input type="text" name="empresa" placeholder="Nombre de la Empresa (Ej. Ferretería El Tornillo)" required style="width: 300px;">
-        <input type="text" name="nombre_contacto" placeholder="Nombre del Contacto" required style="width: 250px;">
-        <input type="text" name="telefono" placeholder="Teléfono" style="width: 180px;">
-        <button type="submit" class="btn btn-add">Guardar Cliente</button>
-    </form>
+    <a href="{{ url_for('ventas') }}" class="btn btn-secondary">
+        <i class="fas fa-cash-register"></i>
+        Ver ventas
+    </a>
+</div>
+
+{% set clientes_con_telefono = clientes | selectattr('telefono') | list %}
+
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Clientes registrados</div>
+        <div class="kpi-value">{{ clientes|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Empresas</div>
+        <div class="kpi-value">{{ clientes|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Con teléfono</div>
+        <div class="kpi-value">{{ clientes_con_telefono|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Cartera activa</div>
+        <div class="kpi-value">Sí</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-users"></i> Estado del directorio</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="client-summary">
+                <div class="client-summary-item">
+                    <div>
+                        <strong>Clientes dados de alta</strong>
+                        <span>Empresas registradas en el sistema</span>
+                    </div>
+                    <span class="badge badge-info">{{ clientes|length }}</span>
+                </div>
+
+                <div class="client-summary-item">
+                    <div>
+                        <strong>Contactos con teléfono</strong>
+                        <span>Clientes con dato de contacto capturado</span>
+                    </div>
+                    <span class="badge badge-success">{{ clientes_con_telefono|length }}</span>
+                </div>
+
+                <div class="client-summary-item">
+                    <div>
+                        <strong>Uso comercial</strong>
+                        <span>Base lista para ventas y pedidos</span>
+                    </div>
+                    <span class="badge badge-success">Activo</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="client-empty-note">
+                Mantén actualizados la empresa, contacto y teléfono para mejorar ventas, pedidos
+                y la asignación logística de entregas.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-user-plus"></i> Registrar nuevo cliente</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="{{ url_for('clientes') }}" method="POST">
+            <div class="form-grid cols-4">
+                <div class="field">
+                    <label for="empresa">Empresa</label>
+                    <input id="empresa" type="text" name="empresa" class="input" required />
+                </div>
+
+                <div class="field">
+                    <label for="nombre_contacto">Contacto principal</label>
+                    <input id="nombre_contacto" type="text" name="nombre_contacto" class="input" required />
+                </div>
+
+                <div class="field">
+                    <label for="telefono">Teléfono</label>
+                    <input id="telefono" type="text" name="telefono" class="input" />
+                </div>
+
+                <div class="field" style="display:flex; align-items:flex-end;">
+                    <button type="submit" class="btn btn-primary" style="width:100%;">
+                        <i class="fas fa-floppy-disk"></i>
+                        Guardar cliente
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div class="card">
-    <h4>Cartera de Clientes</h4>
-    <table>
-        <thead>
-            <tr>
-                <th>Empresa</th>
-                <th>Contacto Principal</th>
-                <th>Teléfono</th>
-            </tr>
-        </thead>
-        <tbody>
+    <div class="card-header">
+        <h3><i class="fas fa-address-book"></i> Cartera de clientes</h3>
+        <span class="badge badge-neutral">{{ clientes|length }} registros</span>
+    </div>
+
+    <div class="card-body">
+        <div class="client-card-grid">
             {% for cliente in clientes %}
-            <tr>
-                <td><strong>{{ cliente.empresa }}</strong></td>
-                <td>{{ cliente.nombre_contacto }}</td>
-                <td>{{ cliente.telefono if cliente.telefono else 'N/A' }}</td>
-            </tr>
+                <div class="client-card">
+                    <div class="client-card-top">
+                        <h4 class="client-company">{{ cliente.empresa }}</h4>
+                        <div class="client-contact">{{ cliente.nombre_contacto }}</div>
+                    </div>
+
+                    <div class="client-body">
+                        <div class="client-row">
+                            <strong>Contacto:</strong> {{ cliente.nombre_contacto }}
+                        </div>
+
+                        <div class="client-row">
+                            <strong>Teléfono:</strong> {{ cliente.telefono if cliente.telefono else 'N/A' }}
+                        </div>
+
+                        <div class="client-row">
+                            <span class="badge badge-success">Cliente activo</span>
+                        </div>
+                    </div>
+                </div>
             {% else %}
-            <tr><td colspan="3" style="text-align: center; color: #6c757d;">No hay clientes registrados.</td></tr>
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <i class="fas fa-user-group"></i>
+                            No hay clientes registrados todavía.
+                        </div>
+                    </div>
+                </div>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    </div>
 </div>
 {% endblock %}

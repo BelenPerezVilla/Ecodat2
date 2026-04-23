@@ -2,6 +2,20 @@
 
 {% block title %}Detalle del Pedido - EcoData{% endblock %}
 
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del detalle del pedido.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/pedidos">Pedidos</a>
+    <span class="sep">/</span>
+    <span>Detalle del pedido</span>
+</div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
     /*

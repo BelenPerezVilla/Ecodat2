@@ -1,50 +1,181 @@
 {% extends "base.html" %}
 
+{% block title %}Alertas de Mantenimiento - EcoData{% endblock %}
+
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del panel de alertas de mantenimiento.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/mantenimiento">Mantenimiento</a>
+    <span class="sep">/</span>
+    <span>Alertas críticas</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del panel de alertas.
+    */
+    .alert-banner {
+        background: #fff7db;
+        border-left: 5px solid #f59e0b;
+        padding: 20px;
+        border-radius: 14px;
+        margin-bottom: 22px;
+        box-shadow: var(--shadow);
+    }
+
+    .alert-banner h4 {
+        margin: 0;
+        color: #92400e;
+    }
+
+    .alert-banner p {
+        margin: 8px 0 0;
+        color: #a16207;
+    }
+
+    .alert-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+    }
+
+    .alert-card {
+        background: #fff;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        border-top: 5px solid #f59e0b;
+        border: 1px solid var(--border);
+    }
+
+    .alert-card-head {
+        background: #fff8e1;
+        padding: 12px 16px;
+        border-bottom: 1px solid #f8f1d8;
+    }
+
+    .alert-card-head span {
+        font-size: 0.8rem;
+        font-weight: 800;
+        color: #92400e;
+    }
+
+    .alert-card-body {
+        padding: 20px;
+    }
+
+    .alert-state {
+        color: #dc2626;
+        font-weight: 800;
+        font-size: 1.05rem;
+        margin-bottom: 14px;
+    }
+
+    .alert-box {
+        background: #f8fafc;
+        padding: 12px;
+        border-radius: 12px;
+        margin-bottom: 18px;
+        color: #334155;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+
+    .alert-empty {
+        grid-column: 1 / -1;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="padding: 20px; background-color: #f8f9fc; min-height: 100vh;">
-    
-    <div style="background: #fff3cd; border-left: 5px solid #ffc107; padding: 20px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        <h5 style="color: #856404; margin: 0; font-weight: bold;">Panel de Atención Prioritaria</h5>
-        <p style="color: #856404; margin: 5px 0 0 0;">
-            Tienes <strong>{{ alertas|length }}</strong> mantenimientos vencidos o próximos a vencer esta semana.
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Alertas críticas de mantenimiento</h1>
+        <p class="page-subtitle">
+            Consulta equipos con mantenimientos vencidos o próximos a vencer para atenderlos a tiempo.
         </p>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
-        {% for a in alertas %}
-        <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #ffc107;">
-            <div style="background: #fdf7e3; padding: 10px 15px; border-bottom: 1px solid #f8f1d8;">
-                <span style="font-size: 0.8em; font-weight: bold; color: #856404;">ID MÁQUINA: {{ a.id_maquina }}</span>
+    <a href="{{ url_for('mantenimiento') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i>
+        Volver a mantenimiento
+    </a>
+</div>
+
+<div class="alert-banner">
+    <h4>Panel de atención prioritaria</h4>
+    <p>
+        Tienes <strong>{{ alertas|length }}</strong> mantenimientos vencidos o próximos a vencer
+        al día {{ hoy.strftime('%d/%m/%Y') if hoy else '' }}.
+    </p>
+</div>
+
+<div class="grid grid-3" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Alertas críticas</div>
+        <div class="kpi-value">{{ alertas|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Fecha de corte</div>
+        <div class="kpi-value">{{ hoy.strftime('%d/%m') if hoy else '-' }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Estado del panel</div>
+        <div class="kpi-value">{% if alertas|length > 0 %}Atender{% else %}Al día{% endif %}</div>
+    </div>
+</div>
+
+<div class="alert-grid">
+    {% for a in alertas %}
+        <div class="alert-card">
+            <div class="alert-card-head">
+                <span>
+                    {% if a.maquina %}
+                        {{ a.maquina.nombre }}
+                    {% else %}
+                        ID MÁQUINA: {{ a.id_maquina }}
+                    {% endif %}
+                </span>
             </div>
-            
-            <div style="padding: 20px;">
-                <div style="margin-bottom: 15px;">
-                    <small style="color: #b7b9cc; font-weight: bold; text-transform: uppercase; font-size: 0.7em;">Estado de Alerta</small>
-                    <div style="color: #e74a3b; font-weight: bold; font-size: 1.1em;">VENCE PRONTO</div>
+
+            <div class="alert-card-body">
+                <div class="alert-state">VENCE PRONTO</div>
+
+                <div class="alert-box">
+                    <div><strong>Programado para:</strong> {{ a.fecha_proxima.strftime('%d/%m/%Y') if a.fecha_proxima else 'N/D' }}</div>
+                    <div><strong>Último técnico:</strong> {{ a.tecnico or 'No asignado' }}</div>
+                    <div><strong>Tipo:</strong> {{ a.tipo }}</div>
                 </div>
 
-                <div style="background: #f8f9fc; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-                    <div style="font-size: 0.85em; margin-bottom: 5px;">
-                        <strong>Programado para:</strong> {{ a.fecha_proxima.strftime('%d/%m/%Y') }}
-                    </div>
-                    <div style="font-size: 0.85em;">
-                        <strong>Último Técnico:</strong> {{ a.tecnico or 'No asignado' }}
-                    </div>
-                </div>
-
-                <a href="/mantenimiento/atender/{{ a.id_maquina }}" 
-                   style="display: block; text-align: center; background: #4e73df; color: white; text-decoration: none; padding: 12px; border-radius: 8px; font-weight: bold; transition: background 0.3s;">
-                    Abrir Bitácora y Atender
+                <a
+                    href="{{ url_for('atender_orden', id_maquina=a.id_maquina) }}"
+                    class="btn btn-primary"
+                    style="width:100%;"
+                >
+                    <i class="fas fa-wrench"></i>
+                    Abrir bitácora y atender
                 </a>
             </div>
         </div>
-        {% else %}
-        <div style="grid-column: 1 / -1; text-align: center; padding: 50px; color: #1cc88a;">
-            <i class="fas fa-check-circle fa-4x" style="margin-bottom: 15px;"></i>
-            <h3>¡Todo al día!</h3>
-            <p>No hay equipos con mantenimientos pendientes actualmente.</p>
+    {% else %}
+        <div class="card alert-empty">
+            <div class="card-body">
+                <div class="empty-state" style="color: var(--success);">
+                    <i class="fas fa-check-circle"></i>
+                    ¡Todo al día! No hay equipos con mantenimientos pendientes actualmente.
+                </div>
+            </div>
         </div>
-        {% endfor %}
-    </div>
+    {% endfor %}
 </div>
 {% endblock %}

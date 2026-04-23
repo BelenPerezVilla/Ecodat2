@@ -1,121 +1,478 @@
 {% extends "base.html" %}
 
-{% block title %}Catálogo de Productos - Ecodata{% endblock %}
+{% block title %}Catálogo de Productos - EcoData{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/productos">Inventario</a>
+    <span class="sep">/</span>
+    <span>Catálogo de productos</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+        Propósito:
+        Estilos específicos del catálogo de productos.
+    */
+    .product-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .product-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .product-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .product-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .product-code {
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .product-name {
+        font-weight: 800;
+        color: var(--brand-dark);
+    }
+
+    .product-price {
+        font-weight: 800;
+        color: var(--success);
+    }
+
+    .product-empty-note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px dashed var(--border);
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+
+    /*
+        Propósito:
+        Modal para edición de producto.
+    */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        padding: 24px;
+        overflow-y: auto;
+    }
+
+    .modal.is-open {
+        display: block;
+    }
+
+    .modal-content {
+        max-width: 520px;
+        margin: 60px auto;
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        box-shadow: 0 24px 50px rgba(15, 23, 42, 0.18);
+        overflow: hidden;
+    }
+
+    .modal-header {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        color: var(--brand-dark);
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-close {
+        border: none;
+        background: #eef2f7;
+        color: #334155;
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 800;
+    }
+
+    .modal-close:hover {
+        background: #e2e8f0;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-    .card { background: white; padding: 25px; border-radius: 12px; border: 1px solid #eef0f3; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    h4 { color: #4e73df; margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid #f2f4f6; padding-bottom: 10px; }
-    
-    .form-grid { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr; gap: 15px; align-items: end; }
-    input { padding: 12px; border: 1px solid #d1d3e2; border-radius: 8px; width: 100%; box-sizing: border-box; }
-    
-    .btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; transition: 0.3s; text-decoration: none; display: inline-block; }
-    .btn-add { background-color: #1cc88a; }
-    .btn-edit { background-color: #4e73df; padding: 8px 12px; font-size: 0.9rem; }
-    
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f8f9fa; }
-    th { background-color: #f8f9fc; color: #4e73df; font-size: 0.8rem; text-transform: uppercase; }
+{% set total_productos = productos|length %}
+{% set total_precio = namespace(valor=0) %}
+{% for prod in productos %}
+    {% set total_precio.valor = total_precio.valor + (prod.precio or 0) %}
+{% endfor %}
+{% set precio_promedio = (total_precio.valor / total_productos) if total_productos > 0 else 0 %}
 
-    /* Estilos para el Modal */
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-    .modal-content { background-color: white; margin: 10% auto; padding: 30px; border-radius: 12px; width: 400px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); }
-</style>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Catálogo de productos</h1>
+        <p class="page-subtitle">
+            Registra, consulta y edita los productos base que alimentan ventas, pedidos y producción.
+        </p>
+    </div>
 
-<div class="card">
-    <h4><i class="fas fa-plus-circle"></i> Registrar Nuevo Producto</h4>
-    <form action="/productos" method="POST" class="form-grid">
-        <div>
-            <label style="font-size: 0.75rem; font-weight: bold; color: #858796;">NOMBRE</label>
-            <input type="text" name="nombre_producto" required>
-        </div>
-        <div>
-            <label style="font-size: 0.75rem; font-weight: bold; color: #858796;">DESCRIPCIÓN</label>
-            <input type="text" name="descripcion">
-        </div>
-        <div>
-            <label style="font-size: 0.75rem; font-weight: bold; color: #858796;">PRECIO ($)</label>
-            <input type="number" name="precio" step="0.01" required>
-        </div>
-        <button type="submit" class="btn btn-add">Guardar</button>
-    </form>
+    <div class="page-actions">
+        <a href="{{ url_for('inventario_productos') }}" class="btn btn-secondary">
+            <i class="fas fa-boxes-stacked"></i>
+            Ver inventario terminado
+        </a>
+    </div>
 </div>
 
-<div class="card">
-    <h4><i class="fas fa-list"></i> Catálogo de Productos</h4>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Descripción</th>
-                <th>Precio</th>
-                <th style="text-align: center;">Acción</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for prod in productos %}
-            <tr>
-                <td style="color: #b7b9cc;">#{{ "%03d" | format(prod.id_producto) }}</td>
-                <td><strong>{{ prod.nombre_producto }}</strong></td>
-                <td>{{ prod.descripcion }}</td>
-                <td style="font-weight: bold; color: #2d3748;">${{ "{:,.2f}".format(prod.precio) }}</td>
-                <td style="text-align: center;">
-                    <button class="btn btn-edit" onclick="openEditModal('{{ prod.id_producto }}', '{{ prod.nombre_producto }}', '{{ prod.descripcion }}', '{{ prod.precio }}')">
-                        <i class="fas fa-edit"></i>
+<div class="grid grid-4" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Productos registrados</div>
+        <div class="kpi-value">{{ total_productos }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Precio promedio</div>
+        <div class="kpi-value">${{ "{:,.2f}".format(precio_promedio) }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Producto más caro</div>
+        <div class="kpi-value">
+            {% if productos %}
+                ${{ "{:,.0f}".format((productos | map(attribute='precio') | list | max) or 0) }}
+            {% else %}
+                $0
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Catálogo activo</div>
+        <div class="kpi-value">Sí</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 22px;">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-cubes"></i> Estado del catálogo</h3>
+        </div>
+
+        <div class="card-body">
+            <div class="product-summary">
+                <div class="product-summary-item">
+                    <div>
+                        <strong>Productos disponibles</strong>
+                        <span>Artículos cargados en el sistema</span>
+                    </div>
+                    <span class="badge badge-info">{{ total_productos }}</span>
+                </div>
+
+                <div class="product-summary-item">
+                    <div>
+                        <strong>Precio promedio</strong>
+                        <span>Valor medio del catálogo</span>
+                    </div>
+                    <span class="badge badge-success">${{ "{:,.2f}".format(precio_promedio) }}</span>
+                </div>
+
+                <div class="product-summary-item">
+                    <div>
+                        <strong>Sistema comercial</strong>
+                        <span>Productos listos para ventas y pedidos</span>
+                    </div>
+                    <span class="badge badge-success">Activo</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Recomendaciones operativas</h3>
+        </div>
+
+        <div class="card-body">
+            {% if productos %}
+                <div class="product-empty-note">
+                    Mantén actualizados el nombre, descripción y precio para que ventas, pedidos
+                    e inventario trabajen con la misma base comercial.
+                </div>
+            {% else %}
+                <div class="product-empty-note">
+                    Registra tu primer producto para comenzar a usar ventas, pedidos e inventario terminado.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if puede('productos.crear') %}
+<div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+        <h3><i class="fas fa-plus-circle"></i> Registrar nuevo producto</h3>
+    </div>
+
+    <div class="card-body">
+        <form action="{{ url_for('productos') }}" method="POST">
+            <div class="form-grid cols-4">
+                <div class="field">
+                    <label for="nombre_producto">Nombre</label>
+                    <input id="nombre_producto" type="text" name="nombre_producto" class="input" required />
+                </div>
+
+                <div class="field">
+                    <label for="descripcion">Descripción</label>
+                    <input id="descripcion" type="text" name="descripcion" class="input" />
+                </div>
+
+                <div class="field">
+                    <label for="precio">Precio ($)</label>
+                    <input id="precio" type="number" name="precio" class="input" step="0.01" min="0" required />
+                </div>
+
+                <div class="field" style="display:flex; align-items:flex-end;">
+                    <button type="submit" class="btn btn-primary" style="width:100%;">
+                        <i class="fas fa-floppy-disk"></i>
+                        Guardar
                     </button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div id="editModal" class="modal">
-    <div class="modal-content">
-        <h3 style="margin-top: 0; color: #4e73df;">Editar Producto</h3>
-        <form id="editForm" method="POST">
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre</label>
-                <input type="text" name="nombre_producto" id="edit_nombre" required>
-            </div>
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción</label>
-                <input type="text" name="descripcion" id="edit_desc">
-            </div>
-            <div style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Precio</label>
-                <input type="number" name="precio" id="edit_precio" step="0.01" required>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button type="button" onclick="closeModal()" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer;">Cancelar</button>
-                <button type="submit" style="flex: 1; padding: 10px; border-radius: 8px; border: none; background: #4e73df; color: white; font-weight: bold; cursor: pointer;">Actualizar</button>
+                </div>
             </div>
         </form>
     </div>
 </div>
+{% endif %}
 
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-list"></i> Catálogo de productos</h3>
+        <span class="badge badge-neutral">{{ total_productos }} registros</span>
+    </div>
+
+    <div class="card-body" style="padding:0;">
+        <div class="table-tools">
+            <div class="table-filters">
+                <div class="filtro-input-wrap">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <input
+                        id="filtroProductosTexto"
+                        type="text"
+                        class="input"
+                        placeholder="Buscar por ID, nombre, descripción o precio"
+                    />
+                </div>
+
+                <button type="button" class="btn btn-outline" id="limpiarProductosFiltros">
+                    <i class="fas fa-rotate-left"></i>
+                    Limpiar
+                </button>
+            </div>
+
+            <div class="toolbar-counter" id="contadorProductos">{{ total_productos }} resultados</div>
+        </div>
+
+        <div class="table-shell">
+            <table class="table" id="tablaProductos">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th>Precio</th>
+                        <th style="text-align:center;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prod in productos %}
+                        <tr
+                            class="js-filter-row"
+                            data-search="{{ ('#' ~ prod.id_producto ~ ' ' ~ (prod.nombre_producto or '') ~ ' ' ~ (prod.descripcion or '') ~ ' ' ~ (prod.precio or ''))|lower }}"
+                        >
+                            <td>
+                                <span class="product-code">#{{ "%03d"|format(prod.id_producto) }}</span>
+                            </td>
+
+                            <td>
+                                <span class="product-name">{{ prod.nombre_producto }}</span>
+                            </td>
+
+                            <td>{{ prod.descripcion or 'Sin descripción' }}</td>
+
+                            <td>
+                                <span class="product-price">${{ "{:,.2f}".format(prod.precio or 0) }}</span>
+                            </td>
+
+                            <td style="text-align:center;">
+                                {% if puede('productos.editar') %}
+                                    <button
+                                        class="btn btn-secondary btn-sm"
+                                        type="button"
+                                        data-id="{{ prod.id_producto }}"
+                                        data-nombre="{{ prod.nombre_producto }}"
+                                        data-descripcion="{{ prod.descripcion or '' }}"
+                                        data-precio="{{ prod.precio or 0 }}"
+                                        onclick="openEditModalFromButton(this)"
+                                    >
+                                        <i class="fas fa-edit"></i>
+                                        Editar
+                                    </button>
+                                {% else %}
+                                    <span class="badge badge-neutral">Solo lectura</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <i class="fas fa-box-open"></i>
+                                    No hay productos registrados todavía.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="emptyProductosDynamic" class="results-empty-inline">
+            <div class="empty-state">
+                <i class="fas fa-filter-circle-xmark"></i>
+                No hay productos que coincidan con la búsqueda.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--
+    Propósito:
+    Modal para editar producto.
+-->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Editar producto</h3>
+            <button type="button" class="modal-close" onclick="closeModal()">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            <form id="editForm" method="POST">
+                <div class="field" style="margin-bottom: 16px;">
+                    <label for="edit_nombre">Nombre</label>
+                    <input type="text" name="nombre_producto" id="edit_nombre" class="input" required />
+                </div>
+
+                <div class="field" style="margin-bottom: 16px;">
+                    <label for="edit_desc">Descripción</label>
+                    <input type="text" name="descripcion" id="edit_desc" class="input" />
+                </div>
+
+                <div class="field" style="margin-bottom: 20px;">
+                    <label for="edit_precio">Precio</label>
+                    <input type="number" name="precio" id="edit_precio" class="input" step="0.01" min="0" required />
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeModal()">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="flex:1;" data-loading-text="Guardando...">
+                        Guardar cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-    const modal = document.getElementById("editModal");
+    /*
+        Propósito:
+        Abrir el modal de edición leyendo los datos del botón.
+    */
+    function openEditModalFromButton(button) {
+        const id = button.dataset.id || "";
+        const nombre = button.dataset.nombre || "";
+        const descripcion = button.dataset.descripcion || "";
+        const precio = button.dataset.precio || "0";
 
-    function openEditModal(id, nombre, desc, precio) {
-        document.getElementById("editForm").action = "/editar_producto/" + id;
         document.getElementById("edit_nombre").value = nombre;
-        document.getElementById("edit_desc").value = desc;
+        document.getElementById("edit_desc").value = descripcion;
         document.getElementById("edit_precio").value = precio;
-        modal.style.display = "block";
+        document.getElementById("editForm").action = "/editar_producto/" + id;
+
+        document.getElementById("editModal").classList.add("is-open");
     }
 
+    /*
+        Propósito:
+        Cerrar modal de edición.
+    */
     function closeModal() {
-        modal.style.display = "none";
+        document.getElementById("editModal").classList.remove("is-open");
     }
 
-    // Cerrar si hacen clic fuera del cuadrito blanco
-    window.onclick = function(event) {
-        if (event.target == modal) {
+    /*
+        Propósito:
+        Cerrar modal al hacer clic fuera del contenido.
+    */
+    window.addEventListener("click", function(event) {
+        const modal = document.getElementById("editModal");
+        if (event.target === modal) {
             closeModal();
         }
-    }
+    });
+
+    /*
+        Propósito:
+        Inicializar filtros del catálogo de productos.
+    */
+    document.addEventListener("DOMContentLoaded", function () {
+        initSmartTableFilters({
+            tableId: "tablaProductos",
+            textInputId: "filtroProductosTexto",
+            counterId: "contadorProductos",
+            emptyStateId: "emptyProductosDynamic",
+            clearButtonId: "limpiarProductosFiltros"
+        });
+    });
 </script>
 {% endblock %}

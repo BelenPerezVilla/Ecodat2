@@ -2,54 +2,312 @@
 
 {% block title %}Compras - Punto de Venta{% endblock %}
 
-{% block content %}
+{% block breadcrumbs %}
+<!--
+    Propósito:
+    Mostrar ruta visual de navegación del módulo de compras.
+-->
+<div class="breadcrumbs">
+    <a href="/dashboard">Inicio</a>
+    <span class="sep">/</span>
+    <a href="/compras">Compras</a>
+    <span class="sep">/</span>
+    <span>Registro de compras</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
-    /* Estilos del layout dividido */
-    .pos-container { display: flex; gap: 20px; height: calc(100vh - 100px); }
-    
-    /* Panel Izquierdo: Catálogo */
-    .catalogo-panel { flex: 2; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow-y: auto; }
-    .productos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
-    
-    .producto-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center; }
-    .producto-img { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; margin-bottom: 10px; }
-    .producto-titulo { font-size: 1rem; font-weight: bold; margin: 5px 0; color: #2d3748; }
-    .producto-precio { color: #4a5568; font-weight: bold; margin-bottom: 10px; }
-    
-    .input-cantidad { width: 60px; padding: 5px; text-align: center; border: 1px solid #a0aec0; border-radius: 4px; margin-bottom: 10px; }
-    .btn-agregar { background-color: #ecc94b; color: #744210; font-weight: bold; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; width: 100%; transition: 0.2s;}
-    .btn-agregar:hover { background-color: #d69e2e; }
+    /*
+        Propósito:
+        Estilos específicos del módulo de compras tipo carrito.
+    */
+    .pos-container {
+        display: grid;
+        grid-template-columns: 1.35fr 0.95fr;
+        gap: 20px;
+        align-items: start;
+    }
 
-    /* Panel Derecho: Carrito */
-    .carrito-panel { flex: 1.5; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-    .carrito-header { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;}
-    
-    .btn-pdf { background-color: #3182ce; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;}
-    .btn-pdf:hover { background-color: #2b6cb0; }
-    .btn-comprar { background-color: #38a169; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;}
-    .btn-comprar:hover { background-color: #2f855a; }
-    
-    .table-carrito { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem;}
-    .table-carrito th { border-bottom: 2px solid #e2e8f0; padding: 10px; text-align: left; color: #4a5568; }
-    .table-carrito td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
-    .btn-eliminar { background: #e53e3e; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
-    .btn-eliminar:hover { background: #c53030; }
+    .catalogo-panel,
+    .carrito-panel {
+        background: #ffffff;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+    }
+
+    .catalogo-panel {
+        padding: 20px;
+    }
+
+    .carrito-panel {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        min-height: 620px;
+    }
+
+    .panel-title {
+        margin: 0 0 18px;
+        color: var(--brand-dark);
+        font-size: 1.25rem;
+        font-weight: 800;
+    }
+
+    .productos-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .producto-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 12px;
+        text-align: center;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .producto-img {
+        width: 100%;
+        height: 130px;
+        object-fit: cover;
+        border-radius: 12px;
+        margin-bottom: 12px;
+        background: #f8fafc;
+    }
+
+    .producto-titulo {
+        font-size: 1rem;
+        font-weight: 800;
+        margin: 5px 0;
+        color: var(--brand-dark);
+    }
+
+    .producto-precio {
+        color: #475569;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .input-cantidad {
+        width: 74px;
+        padding: 8px;
+        text-align: center;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+
+    .btn-agregar {
+        background-color: #facc15;
+        color: #713f12;
+        font-weight: 800;
+        border: none;
+        padding: 10px 14px;
+        border-radius: 12px;
+        cursor: pointer;
+        width: 100%;
+        transition: 0.2s;
+    }
+
+    .btn-agregar:hover {
+        background-color: #eab308;
+    }
+
+    .carrito-header {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .carrito-header form {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .btn-pdf {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        padding: 11px 15px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 800;
+    }
+
+    .btn-pdf:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-comprar {
+        background-color: #16a34a;
+        color: white;
+        border: none;
+        padding: 11px 15px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 800;
+    }
+
+    .btn-comprar:hover {
+        background-color: #15803d;
+    }
+
+    .table-carrito {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 0.92rem;
+    }
+
+    .table-carrito th {
+        border-bottom: 2px solid #e2e8f0;
+        padding: 12px 10px;
+        text-align: left;
+        color: #475569;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .table-carrito td {
+        padding: 12px 10px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .btn-eliminar {
+        background: #ef4444;
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+
+    .btn-eliminar:hover {
+        background: #dc2626;
+    }
+
+    .carrito-total {
+        text-align: right;
+        font-size: 1.55rem;
+        font-weight: 800;
+        margin-top: 15px;
+        color: var(--brand-dark);
+    }
+
+    .carrito-body {
+        flex-grow: 1;
+        overflow-y: auto;
+        border-top: 1px solid transparent;
+    }
+
+    .compra-summary {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .compra-summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .compra-summary-item strong {
+        display: block;
+        color: var(--brand-dark);
+        margin-bottom: 4px;
+    }
+
+    .compra-summary-item span {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    @media (max-width: 1120px) {
+        .pos-container {
+            grid-template-columns: 1fr;
+        }
+
+        .carrito-panel {
+            min-height: auto;
+        }
+    }
 </style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Compras - punto de venta</h1>
+        <p class="page-subtitle">
+            Registra compras rápidas de materiales o chatarra usando carrito, proveedor y ticket PDF.
+        </p>
+    </div>
+
+    <a href="{{ url_for('historial_compras') }}" class="btn btn-secondary">
+        <i class="fas fa-clock-rotate-left"></i>
+        Historial de compras
+    </a>
+</div>
+
+<div class="grid grid-3" style="margin-bottom: 20px;">
+    <div class="kpi">
+        <div class="kpi-label">Proveedores disponibles</div>
+        <div class="kpi-value">{{ proveedores|length }}</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Carrito</div>
+        <div class="kpi-value" id="kpiItemsCarrito">0</div>
+    </div>
+
+    <div class="kpi">
+        <div class="kpi-label">Total actual</div>
+        <div class="kpi-value" id="kpiTotalCarrito">$0.00</div>
+    </div>
+</div>
 
 <div class="pos-container">
-    
     <div class="catalogo-panel">
-        <h2 style="margin-top: 0; color: #2d3748;">Shopping Cart</h2>
-        
+        <h2 class="panel-title">Catálogo rápido de materiales</h2>
+
+        <div class="compra-summary">
+            <div class="compra-summary-item">
+                <div>
+                    <strong>Flujo rápido de compra</strong>
+                    <span>Selecciona materiales, proveedor y genera ticket</span>
+                </div>
+                <span class="badge badge-info">Activo</span>
+            </div>
+        </div>
+
         <div class="productos-grid">
             <div class="producto-card">
                 <img src="{{ url_for('static', filename='img/lamina.png') }}" class="producto-img" alt="Lámina">
                 <div class="producto-titulo">Lámina</div>
                 <div class="producto-precio">$200.00</div>
                 <input type="number" id="cant_1" class="input-cantidad" value="1" min="1">
-                <button class="btn-agregar" onclick="agregarAlCarrito(1, 'Lámina', 200)">Agregar al carrito</button>
+                <button class="btn-agregar" type="button" onclick="agregarAlCarrito(1, 'Lámina', 200)">
+                    Agregar al carrito
+                </button>
             </div>
 
             <div class="producto-card">
@@ -57,7 +315,9 @@
                 <div class="producto-titulo">Vehículos Viejos</div>
                 <div class="producto-precio">$150.00</div>
                 <input type="number" id="cant_2" class="input-cantidad" value="1" min="1">
-                <button class="btn-agregar" onclick="agregarAlCarrito(2, 'Vehículos Viejos', 150)">Agregar al carrito</button>
+                <button class="btn-agregar" type="button" onclick="agregarAlCarrito(2, 'Vehículos Viejos', 150)">
+                    Agregar al carrito
+                </button>
             </div>
 
             <div class="producto-card">
@@ -65,7 +325,9 @@
                 <div class="producto-titulo">Electrodomésticos</div>
                 <div class="producto-precio">$230.00</div>
                 <input type="number" id="cant_3" class="input-cantidad" value="1" min="1">
-                <button class="btn-agregar" onclick="agregarAlCarrito(3, 'Electrodomésticos', 230)">Agregar al carrito</button>
+                <button class="btn-agregar" type="button" onclick="agregarAlCarrito(3, 'Electrodomésticos', 230)">
+                    Agregar al carrito
+                </button>
             </div>
 
             <div class="producto-card">
@@ -73,36 +335,46 @@
                 <div class="producto-titulo">Chatarra Metal</div>
                 <div class="producto-precio">$280.00</div>
                 <input type="number" id="cant_4" class="input-cantidad" value="1" min="1">
-                <button class="btn-agregar" onclick="agregarAlCarrito(4, 'Chatarra Metal', 280)">Agregar al carrito</button>
+                <button class="btn-agregar" type="button" onclick="agregarAlCarrito(4, 'Chatarra Metal', 280)">
+                    Agregar al carrito
+                </button>
             </div>
         </div>
     </div>
 
     <div class="carrito-panel">
-        <h2 style="margin-top: 0; text-align: center; color: #2d3748;">Item selected</h2>
-        
+        <h2 class="panel-title" style="text-align:center;">Items seleccionados</h2>
+
         <div class="carrito-header">
             <button type="button" class="btn-pdf" onclick="imprimirPDF()">
                 <i class="fas fa-file-pdf"></i> Imprimir Ticket
             </button>
-            
-            <form id="formCompra" action="/procesar_carrito" method="POST" style="margin: 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                
-                <select name="id_proveedor" required style="padding: 8px; border-radius: 4px; border: 1px solid #a0aec0;">
+
+            <form id="formCompra" action="{{ url_for('procesar_carrito') }}" method="POST">
+                <select name="id_proveedor" required class="select" style="min-width: 210px;">
                     <option value="" disabled selected>Proveedor...</option>
                     {% for p in proveedores %}
                         <option value="{{ p.id_proveedor }}">{{ p.nombre }}</option>
                     {% endfor %}
                 </select>
 
-                <input type="text" name="folio_factura" placeholder="Factura (Opcional)" style="padding: 8px; border-radius: 4px; border: 1px solid #a0aec0; width: 140px;">
+                <input
+                    type="text"
+                    name="folio_factura"
+                    placeholder="Factura (Opcional)"
+                    class="input"
+                    style="min-width: 180px;"
+                >
 
                 <input type="hidden" name="datos_carrito" id="datos_carrito">
-                <button type="button" class="btn-comprar" onclick="realizarCompra()">Realizar Compra</button>
+
+                <button type="button" class="btn-comprar" onclick="realizarCompra()">
+                    Realizar Compra
+                </button>
             </form>
         </div>
 
-        <div style="flex-grow: 1; overflow-y: auto;">
+        <div class="carrito-body">
             <table class="table-carrito" id="tablaCarrito">
                 <thead>
                     <tr>
@@ -114,33 +386,37 @@
                         <th class="col-accion">Acción</th>
                     </tr>
                 </thead>
-                <tbody id="cuerpoCarrito">
-                    </tbody>
+                <tbody id="cuerpoCarrito"></tbody>
             </table>
         </div>
-        
-        <div style="text-align: right; font-size: 1.5rem; font-weight: bold; margin-top: 15px; color: #2d3748;">
+
+        <div class="carrito-total">
             Gran Total: $<span id="granTotal">0.00</span>
         </div>
     </div>
-
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
     let carrito = [];
 
+    /*
+        Propósito:
+        Agregar productos al carrito manteniendo la estructura original.
+    */
     function agregarAlCarrito(id, nombre, precio) {
         let cantidadInput = document.getElementById(`cant_${id}`);
         let cantidad = parseFloat(cantidadInput.value);
 
-        if(cantidad <= 0 || isNaN(cantidad)) {
+        if (cantidad <= 0 || isNaN(cantidad)) {
             alert("Por favor ingresa una cantidad válida.");
             return;
         }
 
         let itemExistente = carrito.find(item => item.id === id);
 
-        if(itemExistente) {
+        if (itemExistente) {
             itemExistente.cantidad += cantidad;
             itemExistente.total = itemExistente.cantidad * itemExistente.precio;
         } else {
@@ -153,81 +429,100 @@
             });
         }
 
-        cantidadInput.value = 1; // Reseteamos el input a 1
+        cantidadInput.value = 1;
         actualizarTabla();
     }
 
+    /*
+        Propósito:
+        Eliminar una línea del carrito.
+    */
     function eliminarDelCarrito(index) {
         carrito.splice(index, 1);
         actualizarTabla();
     }
 
+    /*
+        Propósito:
+        Refrescar la tabla visual del carrito y KPIs rápidos.
+    */
     function actualizarTabla() {
-        let tbody = document.getElementById('cuerpoCarrito');
-        tbody.innerHTML = '';
+        let tbody = document.getElementById("cuerpoCarrito");
+        tbody.innerHTML = "";
         let granTotal = 0;
+        let totalItems = 0;
 
         carrito.forEach((item, index) => {
             granTotal += item.total;
-            
+            totalItems += item.cantidad;
+
             let fila = `<tr>
                 <td>${item.id}</td>
                 <td>${item.nombre}</td>
                 <td>$${item.precio.toFixed(2)}</td>
                 <td>${item.cantidad}</td>
                 <td><strong>$${item.total.toFixed(2)}</strong></td>
-                <td class="col-accion"><button class="btn-eliminar" onclick="eliminarDelCarrito(${index})">X</button></td>
+                <td class="col-accion">
+                    <button class="btn-eliminar" type="button" onclick="eliminarDelCarrito(${index})">X</button>
+                </td>
             </tr>`;
             tbody.innerHTML += fila;
         });
 
-        document.getElementById('granTotal').innerText = granTotal.toFixed(2);
+        document.getElementById("granTotal").innerText = granTotal.toFixed(2);
+        document.getElementById("kpiTotalCarrito").innerText = `$${granTotal.toFixed(2)}`;
+        document.getElementById("kpiItemsCarrito").innerText = totalItems;
     }
 
+    /*
+        Propósito:
+        Validar el carrito y enviar la compra al backend.
+    */
     function realizarCompra() {
-        if(carrito.length === 0) {
+        if (carrito.length === 0) {
             alert("El carrito está vacío. Agrega productos primero.");
             return;
         }
-        
-        // Validar que se haya seleccionado un proveedor antes de enviar
+
         let selectProveedor = document.querySelector('select[name="id_proveedor"]');
-        if(!selectProveedor.value) {
+        if (!selectProveedor.value) {
             alert("Por favor selecciona un proveedor.");
             selectProveedor.focus();
             return;
         }
-        
-        document.getElementById('datos_carrito').value = JSON.stringify(carrito);
-        document.getElementById('formCompra').submit();
+
+        document.getElementById("datos_carrito").value = JSON.stringify(carrito);
+        document.getElementById("formCompra").submit();
     }
 
+    /*
+        Propósito:
+        Generar ticket PDF del carrito actual.
+    */
     function imprimirPDF() {
-        if(carrito.length === 0) {
+        if (carrito.length === 0) {
             alert("El carrito está vacío. Agrega productos primero para generar el ticket.");
             return;
         }
 
-        const elemento = document.querySelector('.carrito-panel');
-        const headerBotones = document.querySelector('.carrito-header');
-        
-        // Ocultar botones y la columna de acciones para el PDF
-        headerBotones.style.display = 'none';
-        const celdasAccion = document.querySelectorAll('.col-accion');
-        celdasAccion.forEach(celda => celda.style.display = 'none');
+        const elemento = document.querySelector(".carrito-panel");
+        const headerBotones = document.querySelector(".carrito-header");
+
+        headerBotones.style.display = "none";
+        const celdasAccion = document.querySelectorAll(".col-accion");
+        celdasAccion.forEach(celda => celda.style.display = "none");
 
         const opciones = {
-            margin:       15,
-            filename:     'Ticket_Compra_EcoData.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            margin: 15,
+            filename: "Ticket_Compra_EcoData.pdf",
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
         };
 
         html2pdf().set(opciones).from(elemento).save().then(() => {
-            // Restaurar botones y la columna de acciones después de generar el PDF
-            headerBotones.style.display = 'flex';
-            celdasAccion.forEach(celda => celda.style.display = 'table-cell');
+            headerBotones.style.display = "flex";
+            celdasAccion.forEach(celda => celda.style.display = "table-cell");
         });
     }
 </script>
